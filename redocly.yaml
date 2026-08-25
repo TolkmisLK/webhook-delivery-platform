@@ -1,0 +1,7 @@
+extends:
+  - recommended
+
+rules:
+  # Read-only operations legitimately have no application-level 4xx response in v0.1.
+  operation-4xx-response: off
+

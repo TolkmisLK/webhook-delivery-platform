@@ -1,0 +1,251 @@
+openapi: 3.1.0
+info:
+  title: Webhook Delivery Platform API
+  version: 0.1.0
+  license:
+    name: MIT
+    identifier: MIT
+  description: |
+    Durable webhook endpoint, event, and delivery operations.
+    持久化 Webhook Endpoint、事件与投递任务 API。
+servers:
+  - url: /
+security: []
+paths:
+  /api/endpoints:
+    get:
+      operationId: listEndpoints
+      summary: List registered endpoints / 查询 Endpoint
+      responses:
+        "200":
+          description: Registered endpoints ordered by creation time.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Endpoint"
+    post:
+      operationId: createEndpoint
+      summary: Register an endpoint / 注册 Endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEndpoint"
+      responses:
+        "201":
+          description: Endpoint created. The signing secret is not returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Endpoint"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /api/events:
+    post:
+      operationId: publishEvent
+      summary: Accept an event / 接收事件
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishEvent"
+      responses:
+        "202":
+          description: Existing idempotent result or newly persisted delivery job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishedEvent"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/deliveries:
+    get:
+      operationId: listDeliveries
+      summary: List recent deliveries / 查询最近投递
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: Recent delivery jobs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Delivery"
+  /api/deliveries/stats:
+    get:
+      operationId: getDeliveryStats
+      summary: Delivery counts by state / 按状态统计投递
+      responses:
+        "200":
+          description: Delivery counts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliveryStats"
+  /api/deliveries/{deliveryId}/replay:
+    post:
+      operationId: replayDelivery
+      summary: Queue a delivery for replay / 重新投递
+      parameters:
+        - $ref: "#/components/parameters/DeliveryId"
+      responses:
+        "200":
+          description: Delivery returned to PENDING with an extended attempt budget.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Delivery"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/deliveries/stream:
+    get:
+      operationId: streamDeliveryUpdates
+      summary: Stream delivery state changes / 订阅投递状态
+      responses:
+        "200":
+          description: Server-sent events named `delivery`.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+components:
+  parameters:
+    DeliveryId:
+      name: deliveryId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    BadRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+  schemas:
+    CreateEndpoint:
+      type: object
+      required: [name, url, secret]
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        url:
+          type: string
+          format: uri
+          maxLength: 2048
+        secret:
+          type: string
+          minLength: 16
+          maxLength: 512
+          writeOnly: true
+    Endpoint:
+      type: object
+      required: [id, name, url, active, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        url: { type: string, format: uri }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    PublishEvent:
+      type: object
+      required: [endpointId, eventType, idempotencyKey, data]
+      properties:
+        endpointId: { type: string, format: uuid }
+        eventType:
+          type: string
+          maxLength: 160
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        idempotencyKey: { type: string, maxLength: 200 }
+        data:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+    PublishedEvent:
+      type: object
+      required: [eventId, deliveryId, status, acceptedAt, duplicate]
+      properties:
+        eventId: { type: string, format: uuid }
+        deliveryId: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/DeliveryStatus" }
+        acceptedAt: { type: string, format: date-time }
+        duplicate: { type: boolean }
+    Delivery:
+      type: object
+      required:
+        - id
+        - eventId
+        - eventType
+        - endpointName
+        - endpointUrl
+        - status
+        - attemptCount
+        - maxAttempts
+        - nextAttemptAt
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        eventType: { type: string }
+        endpointName: { type: string }
+        endpointUrl: { type: string, format: uri }
+        status: { $ref: "#/components/schemas/DeliveryStatus" }
+        attemptCount: { type: integer }
+        maxAttempts: { type: integer }
+        nextAttemptAt: { type: string, format: date-time }
+        lastStatusCode: { type: [integer, "null"] }
+        lastError: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DeliveryStats:
+      type: object
+      required: [total, byStatus]
+      properties:
+        total: { type: integer }
+        byStatus:
+          type: object
+          additionalProperties:
+            type: integer
+    DeliveryStatus:
+      type: string
+      enum: [PENDING, PROCESSING, RETRY_SCHEDULED, SUCCEEDED, DEAD]
+    ApiError:
+      type: object
+      required: [timestamp, status, code, message, fields]
+      properties:
+        timestamp: { type: string, format: date-time }
+        status: { type: integer }
+        code: { type: string }
+        message: { type: string }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+        requestId: { type: [string, "null"] }

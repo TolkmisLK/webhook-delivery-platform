@@ -1,5 +1,173 @@
 # Webhook Delivery Platform
 
-Repository bootstrap; implementation is developed through a reviewed feature branch.
+> Durable, signed, and observable webhook delivery.  
+> 持久化、可签名、可观测的 Webhook 投递平台。
 
-仓库初始化；实现将通过可审查的功能分支交付。
+[English](#english) · [中文](#中文)
+
+## English
+
+Webhook Delivery Platform is a production-style full-stack reference implementation for reliable outbound events. It accepts an event once, persists a delivery job in PostgreSQL, signs the exact request body, and records every delivery outcome for review and replay.
+
+The first release intentionally uses a modular monolith and a PostgreSQL-backed queue. This keeps the consistency boundary explicit while still supporting multiple workers through `FOR UPDATE SKIP LOCKED` leases.
+
+### Engineering evidence
+
+- Java 21, Spring Boot 4.1, Spring Modulith 2.1, PostgreSQL, and Flyway
+- React 19, strict TypeScript, Vite, responsive operations console, and SSE updates
+- At-least-once delivery with idempotent event acceptance
+- HMAC-SHA256 signatures over timestamp and exact request body
+- Exponential backoff, bounded attempts, dead letters, and manual replay
+- AES-256-GCM encryption for endpoint signing secrets
+- URL validation, public-address policy, port allowlist, no redirects, and bounded responses
+- Database leases that recover abandoned `PROCESSING` jobs
+- Bounded virtual-thread execution so jobs are leased only when outbound capacity is available
+- Unit tests, architecture verification, PostgreSQL integration test, frontend tests, and GitHub Actions
+- Docker Compose demo with a signature-verifying receiver
+
+### Quick start
+
+Requirements: Docker with Compose.
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Open [http://localhost:8088](http://localhost:8088).
+
+The console is pre-filled for the included receiver:
+
+- URL: `http://receiver:8090/hooks`
+- Signing secret: `local-demo-secret`
+
+Register the endpoint, publish the sample event, and watch the job move from `PENDING` to `SUCCEEDED`.
+
+### Delivery contract
+
+Every request contains:
+
+```text
+Content-Type: application/json
+X-Webhook-Id: <event UUID>
+X-Webhook-Type: <event type>
+X-Webhook-Timestamp: <Unix seconds>
+X-Webhook-Signature: v1=<HMAC-SHA256>
+```
+
+The signed message is:
+
+```text
+<timestamp>.<exact request body>
+```
+
+Consumers should reject stale timestamps and compare signatures in constant time. The included demo receiver implements constant-time verification.
+
+### Quality checks
+
+```bash
+./scripts/check.sh
+```
+
+The backend gate also checks Google Java Format and verifies the Spring Modulith dependency graph. The PostgreSQL integration test starts an actual target server, confirms idempotent acceptance, waits for the scheduled worker, and cryptographically verifies a successful signed delivery.
+
+### Documentation
+
+- [Architecture](docs/architecture.md)
+- [Security model](docs/security.md)
+- [Security reporting](SECURITY.md)
+- [OpenAPI contract](docs/openapi.yaml)
+- [ADR-0001: PostgreSQL-backed delivery queue](docs/adr/0001-postgresql-delivery-queue.md)
+- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
+
+### Current scope
+
+`v0.1` delivers one persisted event to one endpoint. Planned work includes endpoint lifecycle management, delivery-attempt details in the console, metrics dashboards, concurrency benchmarks, and controlled fault-injection scenarios.
+
+## 中文
+
+Webhook Delivery Platform 是一个生产风格的全栈可靠事件投递参考实现。系统接收事件后，先在 PostgreSQL 中持久化投递任务，再对完整请求体签名，并记录每次投递结果，支持审查和重新投递。
+
+首个版本采用模块化单体与 PostgreSQL 队列，在保持事务边界清晰的同时，通过 `FOR UPDATE SKIP LOCKED` 租约支持多个 Worker 协同处理。
+
+### 工程能力
+
+- Java 21、Spring Boot 4.1、Spring Modulith 2.1、PostgreSQL 与 Flyway
+- React 19、严格 TypeScript、Vite、响应式运维控制台与 SSE 更新
+- At-least-once 投递语义与幂等事件接收
+- 基于时间戳和完整请求体的 HMAC-SHA256 签名
+- 指数退避、有限尝试、死信状态和手动重投
+- 使用 AES-256-GCM 加密 Endpoint 签名密钥
+- URL 校验、公网地址策略、端口白名单、禁止重定向和响应大小限制
+- 数据库任务租约，以及异常中断后对 `PROCESSING` 任务的恢复
+- 有并发上限的虚拟线程执行器，只在存在出站容量时抢占任务
+- 单元测试、模块架构验证、PostgreSQL 集成测试、前端测试和 GitHub Actions
+- 包含签名验证 Receiver 的 Docker Compose 演示环境
+
+### 快速开始
+
+环境要求：Docker 与 Docker Compose。
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+访问 [http://localhost:8088](http://localhost:8088)。
+
+控制台已经预填演示 Receiver 信息：
+
+- 地址：`http://receiver:8090/hooks`
+- 签名密钥：`local-demo-secret`
+
+注册 Endpoint 并发布示例事件后，可以观察任务从 `PENDING` 进入 `SUCCEEDED`。
+
+### 投递协议
+
+每个请求包含以下 Header：
+
+```text
+Content-Type: application/json
+X-Webhook-Id: <事件 UUID>
+X-Webhook-Type: <事件类型>
+X-Webhook-Timestamp: <Unix 秒>
+X-Webhook-Signature: v1=<HMAC-SHA256>
+```
+
+签名原文为：
+
+```text
+<timestamp>.<完整请求体>
+```
+
+接收方应拒绝过期时间戳，并使用常量时间算法比较签名。仓库内的 Demo Receiver 已实现常量时间校验。
+
+### 质量检查
+
+```bash
+cd backend && mvn -B verify
+cd frontend && npm ci && npm run check
+```
+
+PostgreSQL 集成测试会启动真实目标服务，通过 API 验证幂等接收，等待定时 Worker 处理，并对成功投递执行真实签名校验。
+
+后端质量门禁还会检查 Google Java Format，并验证 Spring Modulith 依赖图不存在循环依赖。
+
+### 项目文档
+
+- [架构说明](docs/architecture.md)
+- [安全模型](docs/security.md)
+- [安全问题报告](SECURITY.md)
+- [OpenAPI 契约](docs/openapi.yaml)
+- [ADR-0001：PostgreSQL 投递队列](docs/adr/0001-postgresql-delivery-queue.md)
+- [贡献指南](CONTRIBUTING.md)
+- [变更记录](CHANGELOG.md)
+
+### 当前范围
+
+`v0.1` 支持将一个已持久化事件投递到一个 Endpoint。后续计划包括 Endpoint 生命周期管理、控制台投递详情、指标面板、并发基准测试和可控故障注入。
+
+## License
+
+[MIT](LICENSE) © 2026 NCC

@@ -1,0 +1,29 @@
+name: Feature request / 功能建议
+description: Propose a focused capability with acceptance criteria / 提议有验收标准的聚焦能力
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / 问题
+      description: Describe the operational need before proposing implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome / 期望结果
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria / 验收标准
+      placeholder: "- [ ] ..."
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Reliability and security considerations / 可靠性与安全考虑
