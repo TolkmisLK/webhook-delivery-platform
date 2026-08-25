@@ -1,0 +1,16 @@
+.DS_Store
+.env
+.idea/
+.vscode/
+*.iml
+
+backend/target/
+frontend/node_modules/
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
+
+.tooling/
+.npm-cache/
+
+*.log
+coverage/

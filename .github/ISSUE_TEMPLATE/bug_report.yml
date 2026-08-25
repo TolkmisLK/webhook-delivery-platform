@@ -1,0 +1,38 @@
+name: Bug report / 缺陷报告
+description: Report reproducible incorrect behavior / 报告可复现的错误行为
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior / 实际行为
+      description: Include delivery state, status code, and sanitized logs.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior / 预期行为
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction / 复现步骤
+      placeholder: "1. Register endpoint...\n2. Publish event..."
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit / 版本或 Commit
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check / 安全检查
+      options:
+        - label: Logs and examples are sanitized and contain no active secrets / 日志与示例已脱敏且不包含有效密钥
+          required: true

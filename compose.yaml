@@ -1,0 +1,66 @@
+name: webhook-delivery-platform
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: webhooks
+      POSTGRES_USER: webhooks
+      POSTGRES_PASSWORD: webhooks
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U webhooks -d webhooks"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  receiver:
+    image: node:24-alpine
+    working_dir: /app
+    command: ["node", "demo-receiver.mjs"]
+    environment:
+      PORT: 8090
+      WEBHOOK_SIGNING_SECRET: ${DEMO_WEBHOOK_SECRET:-local-demo-secret}
+    volumes:
+      - ./examples/demo-receiver.mjs:/app/demo-receiver.mjs:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8090/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/webhooks
+      DATABASE_USERNAME: webhooks
+      DATABASE_PASSWORD: webhooks
+      APP_SECURITY_MASTER_KEY: ${APP_SECURITY_MASTER_KEY}
+      APP_SECURITY_ALLOW_PRIVATE_TARGETS: "true"
+      APP_SECURITY_ALLOWED_PORTS: 80,443,8090
+      APP_DELIVERY_WORKER_ID: docker-worker-1
+      APP_DELIVERY_WORKER_CONCURRENCY: 4
+    depends_on:
+      postgres:
+        condition: service_healthy
+      receiver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "8088:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
