@@ -1,9 +1,11 @@
 package dev.ncc.webhook.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import dev.ncc.webhook.delivery.DeliveryJobRepository;
 import dev.ncc.webhook.delivery.DeliveryStatus;
@@ -37,6 +39,7 @@ class WebhookFlowIT {
   private static final AtomicReference<String> RECEIVED_BODY = new AtomicReference<>();
   private static final AtomicReference<String> RECEIVED_SIGNATURE = new AtomicReference<>();
   private static final AtomicInteger RECEIVED_COUNT = new AtomicInteger();
+  private static final AtomicInteger FLAKY_COUNT = new AtomicInteger();
   private static final HttpServer TARGET = startTarget();
 
   @Container
@@ -57,6 +60,8 @@ class WebhookFlowIT {
     registry.add(
         "app.security.allowed-ports", () -> Integer.toString(TARGET.getAddress().getPort()));
     registry.add("app.delivery.poll-interval", () -> "100ms");
+    registry.add("app.delivery.base-retry-delay", () -> "100ms");
+    registry.add("app.delivery.max-retry-delay", () -> "100ms");
   }
 
   @Autowired MockMvc mockMvc;
@@ -139,6 +144,80 @@ class WebhookFlowIT {
     assertThat(RECEIVED_BODY.get()).contains("demo.completed").contains("\"result\":\"ok\"");
     assertThat(RECEIVED_SIGNATURE.get()).startsWith("v1=");
     assertThat(RECEIVED_COUNT.get()).isEqualTo(1);
+
+    String detailJson =
+        mockMvc
+            .perform(get("/api/deliveries/{id}", deliveryId))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    var detail = jsonMapper.readTree(detailJson);
+    assertThat(detail.get("delivery").get("status").asText()).isEqualTo("SUCCEEDED");
+    assertThat(detail.get("attempts").size()).isEqualTo(1);
+    assertThat(detail.get("attempts").get(0).get("outcome").asText()).isEqualTo("SUCCEEDED");
+    assertThat(detail.get("attempts").get(0).get("statusCode").asInt()).isEqualTo(204);
+  }
+
+  @Test
+  void exposesTheAttemptTimelineAfterTransientFailures() throws Exception {
+    FLAKY_COUNT.set(0);
+    String endpointJson =
+        mockMvc
+            .perform(
+                post("/api/endpoints")
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "name": "flaky integration target",
+                          "url": "http://127.0.0.1:%d/hooks/flaky",
+                          "secret": "integration-secret"
+                        }
+                        """
+                            .formatted(TARGET.getAddress().getPort())))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String endpointId = jsonMapper.readTree(endpointJson).get("id").asText();
+
+    String eventJson =
+        mockMvc
+            .perform(
+                post("/api/events")
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "endpointId": "%s",
+                          "eventType": "demo.retry-recovered",
+                          "idempotencyKey": "integration-flaky-1",
+                          "data": {"result": "eventually-ok"}
+                        }
+                        """
+                            .formatted(endpointId)))
+            .andExpect(status().isAccepted())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    UUID deliveryId = UUID.fromString(jsonMapper.readTree(eventJson).get("deliveryId").asText());
+
+    awaitSuccess(deliveryId);
+
+    String detailJson =
+        mockMvc
+            .perform(get("/api/deliveries/{id}", deliveryId))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    var attempts = jsonMapper.readTree(detailJson).get("attempts");
+    assertThat(attempts.size()).isEqualTo(3);
+    assertThat(attempts.get(0).get("outcome").asText()).isEqualTo("RETRY_SCHEDULED");
+    assertThat(attempts.get(1).get("outcome").asText()).isEqualTo("RETRY_SCHEDULED");
+    assertThat(attempts.get(2).get("outcome").asText()).isEqualTo("SUCCEEDED");
+    assertThat(FLAKY_COUNT.get()).isEqualTo(3);
   }
 
   private void awaitSuccess(UUID deliveryId) throws InterruptedException {
@@ -156,25 +235,39 @@ class WebhookFlowIT {
   private static HttpServer startTarget() {
     try {
       HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-      server.createContext(
-          "/hooks",
-          exchange -> {
-            String body =
-                new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-            String timestamp = exchange.getRequestHeaders().getFirst("X-Webhook-Timestamp");
-            String supplied = exchange.getRequestHeaders().getFirst("X-Webhook-Signature");
-            String expected =
-                new HmacSigner().sign("integration-secret", Long.parseLong(timestamp), body);
-            RECEIVED_BODY.set(body);
-            RECEIVED_SIGNATURE.set(supplied);
-            RECEIVED_COUNT.incrementAndGet();
-            exchange.sendResponseHeaders(expected.equals(supplied) ? 204 : 401, -1);
-            exchange.close();
-          });
+      server.createContext("/hooks", exchange -> handleTarget(exchange, false));
+      server.createContext("/hooks/flaky", exchange -> handleTarget(exchange, true));
       server.start();
       return server;
     } catch (IOException exception) {
       throw new ExceptionInInitializerError(exception);
     }
+  }
+
+  private static void handleTarget(HttpExchange exchange, boolean flaky) throws IOException {
+    String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+    String timestamp = exchange.getRequestHeaders().getFirst("X-Webhook-Timestamp");
+    String supplied = exchange.getRequestHeaders().getFirst("X-Webhook-Signature");
+    String expected = new HmacSigner().sign("integration-secret", Long.parseLong(timestamp), body);
+    RECEIVED_BODY.set(body);
+    RECEIVED_SIGNATURE.set(supplied);
+
+    int statusCode;
+    if (!expected.equals(supplied)) {
+      statusCode = 401;
+    } else if (flaky) {
+      statusCode = FLAKY_COUNT.incrementAndGet() <= 2 ? 503 : 204;
+    } else {
+      RECEIVED_COUNT.incrementAndGet();
+      statusCode = 204;
+    }
+
+    byte[] response =
+        statusCode == 503 ? "temporary failure".getBytes(StandardCharsets.UTF_8) : null;
+    exchange.sendResponseHeaders(statusCode, response == null ? -1 : response.length);
+    if (response != null) {
+      exchange.getResponseBody().write(response);
+    }
+    exchange.close();
   }
 }

@@ -68,6 +68,38 @@ public class DeliveryAttempt {
     this.finishedAt = finishedAt;
   }
 
+  public int getAttemptNumber() {
+    return attemptNumber;
+  }
+
+  public DeliveryStatus getOutcome() {
+    return outcome;
+  }
+
+  public Integer getStatusCode() {
+    return statusCode;
+  }
+
+  public String getErrorMessage() {
+    return errorMessage;
+  }
+
+  public String getResponseExcerpt() {
+    return responseExcerpt;
+  }
+
+  public long getDurationMs() {
+    return durationMs;
+  }
+
+  public Instant getStartedAt() {
+    return startedAt;
+  }
+
+  public Instant getFinishedAt() {
+    return finishedAt;
+  }
+
   private String truncate(String value, int maximum) {
     if (value == null || value.length() <= maximum) {
       return value;

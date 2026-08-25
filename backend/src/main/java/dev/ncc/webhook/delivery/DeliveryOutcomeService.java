@@ -4,6 +4,7 @@ import dev.ncc.webhook.common.NotFoundException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +15,7 @@ class DeliveryOutcomeService {
   private final DeliveryAttemptRepository attemptRepository;
   private final RetryPolicy retryPolicy;
   private final DeliveryUpdates updates;
+  private final ApplicationEventPublisher events;
   private final Clock clock;
 
   DeliveryOutcomeService(
@@ -21,11 +23,13 @@ class DeliveryOutcomeService {
       DeliveryAttemptRepository attemptRepository,
       RetryPolicy retryPolicy,
       DeliveryUpdates updates,
+      ApplicationEventPublisher events,
       Clock clock) {
     this.jobRepository = jobRepository;
     this.attemptRepository = attemptRepository;
     this.retryPolicy = retryPolicy;
     this.updates = updates;
+    this.events = events;
     this.clock = clock;
   }
 
@@ -67,6 +71,9 @@ class DeliveryOutcomeService {
             result.durationMs(),
             startedAt,
             now));
+    events.publishEvent(
+        new DeliveryAttemptCompleted(
+            job.getId(), attempt, outcome, result.statusCode(), result.durationMs()));
     updates.publish(job.getId(), outcome.name());
   }
 
@@ -92,6 +99,7 @@ class DeliveryOutcomeService {
       outcome = DeliveryStatus.RETRY_SCHEDULED;
     }
 
+    long durationMs = Math.max(0, java.time.Duration.between(startedAt, now).toMillis());
     attemptRepository.save(
         new DeliveryAttempt(
             UUID.randomUUID(),
@@ -101,9 +109,11 @@ class DeliveryOutcomeService {
             null,
             error,
             null,
-            Math.max(0, java.time.Duration.between(startedAt, now).toMillis()),
+            durationMs,
             startedAt,
             now));
+    events.publishEvent(
+        new DeliveryAttemptCompleted(job.getId(), attempt, outcome, null, durationMs));
     updates.publish(job.getId(), outcome.name());
   }
 }

@@ -34,6 +34,22 @@ export interface DeliveryStats {
   byStatus: Record<DeliveryStatus, number>;
 }
 
+export interface DeliveryAttempt {
+  attemptNumber: number;
+  outcome: DeliveryStatus;
+  statusCode: number | null;
+  errorMessage: string | null;
+  responseExcerpt: string | null;
+  durationMs: number;
+  startedAt: string;
+  finishedAt: string;
+}
+
+export interface DeliveryDetail {
+  delivery: Delivery;
+  attempts: DeliveryAttempt[];
+}
+
 export interface ApiError {
   message?: string;
   fields?: Record<string, string>;

@@ -24,6 +24,9 @@ The first release intentionally uses a modular monolith and a PostgreSQL-backed 
 - Bounded virtual-thread execution so jobs are leased only when outbound capacity is available
 - Unit tests, architecture verification, PostgreSQL integration test, frontend tests, and GitHub Actions
 - Docker Compose demo with a signature-verifying receiver
+- Delivery-attempt detail API and bilingual timeline for committed outcomes
+- After-commit Micrometer attempt counters, duration timers, and structured completion logs
+- Controlled transient-failure receiver for demonstrating retry recovery
 
 ### Quick start
 
@@ -42,6 +45,14 @@ The console is pre-filled for the included receiver:
 - Signing secret: `local-demo-secret`
 
 Register the endpoint, publish the sample event, and watch the job move from `PENDING` to `SUCCEEDED`.
+
+To exercise retry recovery, register another endpoint with this URL:
+
+```text
+http://receiver:8090/hooks/flaky?failures=2
+```
+
+The receiver returns HTTP `503` twice for each event and then succeeds. Use **Inspect** to review the committed attempt timeline. Runtime counters and timers are available through `/actuator/metrics/webhook.delivery.attempts` and `/actuator/metrics/webhook.delivery.duration`.
 
 ### Delivery contract
 
@@ -83,7 +94,7 @@ The backend gate also checks Google Java Format and verifies the Spring Modulith
 
 ### Current scope
 
-`v0.1` delivers one persisted event to one endpoint. Planned work includes endpoint lifecycle management, delivery-attempt details in the console, metrics dashboards, concurrency benchmarks, and controlled fault-injection scenarios.
+`v0.2` adds committed attempt diagnostics, after-commit metrics, and a controlled transient-failure scenario. Planned work includes endpoint lifecycle management, metrics dashboards, concurrency benchmarks, and broader fault-injection coverage.
 
 ## 中文
 
@@ -104,6 +115,9 @@ Webhook Delivery Platform 是一个生产风格的全栈可靠事件投递参考
 - 有并发上限的虚拟线程执行器，只在存在出站容量时抢占任务
 - 单元测试、模块架构验证、PostgreSQL 集成测试、前端测试和 GitHub Actions
 - 包含签名验证 Receiver 的 Docker Compose 演示环境
+- 投递详情 API，以及展示已提交结果的中英双语尝试时间线
+- 事务提交后记录的 Micrometer 尝试计数、耗时指标与结构化完成日志
+- 用于演示重试恢复的可控瞬时失败 Receiver
 
 ### 快速开始
 
@@ -120,6 +134,14 @@ docker compose up --build
 
 - 地址：`http://receiver:8090/hooks`
 - 签名密钥：`local-demo-secret`
+
+如需验证重试恢复，可再注册以下 Endpoint：
+
+```text
+http://receiver:8090/hooks/flaky?failures=2
+```
+
+Receiver 会针对每个事件先返回两次 HTTP `503`，随后成功。可通过“查看详情”审查已提交的尝试时间线；运行时计数与耗时指标可从 `/actuator/metrics/webhook.delivery.attempts` 和 `/actuator/metrics/webhook.delivery.duration` 查询。
 
 注册 Endpoint 并发布示例事件后，可以观察任务从 `PENDING` 进入 `SUCCEEDED`。
 
@@ -166,7 +188,7 @@ PostgreSQL 集成测试会启动真实目标服务，通过 API 验证幂等接�
 
 ### 当前范围
 
-`v0.1` 支持将一个已持久化事件投递到一个 Endpoint。后续计划包括 Endpoint 生命周期管理、控制台投递详情、指标面板、并发基准测试和可控故障注入。
+`v0.2` 增加已提交尝试的诊断信息、事务提交后的运行指标，以及可控瞬时故障场景。后续计划包括 Endpoint 生命周期管理、指标面板、并发基准测试和更完整的故障注入覆盖。
 
 ## License
 

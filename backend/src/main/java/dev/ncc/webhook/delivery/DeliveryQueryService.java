@@ -2,6 +2,8 @@ package dev.ncc.webhook.delivery;
 
 import dev.ncc.webhook.common.NotFoundException;
 import dev.ncc.webhook.config.DeliveryProperties;
+import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryAttemptResponse;
+import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryDetailResponse;
 import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryResponse;
 import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryStats;
 import dev.ncc.webhook.endpoint.WebhookEndpointRepository;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 class DeliveryQueryService {
 
   private final DeliveryJobRepository jobRepository;
+  private final DeliveryAttemptRepository attemptRepository;
   private final WebhookEventRepository eventRepository;
   private final WebhookEndpointRepository endpointRepository;
   private final DeliveryUpdates updates;
@@ -29,12 +32,14 @@ class DeliveryQueryService {
 
   DeliveryQueryService(
       DeliveryJobRepository jobRepository,
+      DeliveryAttemptRepository attemptRepository,
       WebhookEventRepository eventRepository,
       WebhookEndpointRepository endpointRepository,
       DeliveryUpdates updates,
       DeliveryProperties properties,
       Clock clock) {
     this.jobRepository = jobRepository;
+    this.attemptRepository = attemptRepository;
     this.eventRepository = eventRepository;
     this.endpointRepository = endpointRepository;
     this.updates = updates;
@@ -57,6 +62,19 @@ class DeliveryQueryService {
         .forEach(status -> counts.put(status, jobRepository.countByStatus(status)));
     long total = counts.values().stream().mapToLong(Long::longValue).sum();
     return new DeliveryStats(total, counts);
+  }
+
+  @Transactional(readOnly = true)
+  DeliveryDetailResponse detail(UUID id) {
+    DeliveryJob job =
+        jobRepository
+            .findById(id)
+            .orElseThrow(() -> new NotFoundException("Delivery job was not found"));
+    List<DeliveryAttemptResponse> attempts =
+        attemptRepository.findByJobIdOrderByAttemptNumberAsc(id).stream()
+            .map(this::toAttemptResponse)
+            .toList();
+    return new DeliveryDetailResponse(toResponse(job), attempts);
   }
 
   @Transactional
@@ -93,5 +111,17 @@ class DeliveryQueryService {
         job.getLastError(),
         job.getCreatedAt(),
         job.getUpdatedAt());
+  }
+
+  private DeliveryAttemptResponse toAttemptResponse(DeliveryAttempt attempt) {
+    return new DeliveryAttemptResponse(
+        attempt.getAttemptNumber(),
+        attempt.getOutcome(),
+        attempt.getStatusCode(),
+        attempt.getErrorMessage(),
+        attempt.getResponseExcerpt(),
+        attempt.getDurationMs(),
+        attempt.getStartedAt(),
+        attempt.getFinishedAt());
   }
 }

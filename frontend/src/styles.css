@@ -294,6 +294,117 @@ textarea:hover {
   font-weight: 780;
 }
 
+.row-actions {
+  display: flex;
+  gap: 14px;
+  white-space: nowrap;
+}
+
+.attempt-detail {
+  padding: 28px;
+  border-top: 1px solid var(--line);
+  background: rgba(23, 34, 29, 0.025);
+}
+
+.attempt-detail-heading,
+.attempt-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.attempt-detail-heading h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.attempt-detail-heading p:last-child {
+  max-width: 700px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.attempt-timeline {
+  display: grid;
+  gap: 0;
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attempt-timeline li {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 16px;
+  position: relative;
+}
+
+.attempt-timeline li:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 30px;
+  bottom: -8px;
+  left: 14px;
+  width: 1px;
+  background: var(--line);
+}
+
+.attempt-marker {
+  position: relative;
+  z-index: 1;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.attempt-content {
+  padding: 2px 0 24px;
+}
+
+.attempt-summary {
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.attempt-content dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0 0;
+}
+
+.attempt-content dl div {
+  min-width: 0;
+}
+
+.attempt-content dt {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.attempt-content dd {
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.attempt-content .attempt-result {
+  grid-column: 1 / -1;
+}
+
 .primary-button {
   justify-self: start;
   padding: 12px 18px;
@@ -568,6 +679,18 @@ footer {
 
   .span-2 {
     grid-column: span 1;
+  }
+
+  .attempt-detail {
+    padding: 20px;
+  }
+
+  .attempt-detail-heading {
+    align-items: flex-start;
+  }
+
+  .attempt-content dl {
+    grid-template-columns: 1fr;
   }
 
   footer {
