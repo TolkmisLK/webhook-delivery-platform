@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.MDC;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -24,6 +25,15 @@ public class ApiExceptionHandler {
   @ExceptionHandler(NotFoundException.class)
   ResponseEntity<ApiError> handleNotFound(NotFoundException exception) {
     return response(HttpStatus.NOT_FOUND, "not_found", exception.getMessage(), Map.of());
+  }
+
+  @ExceptionHandler({VersionConflictException.class, OptimisticLockingFailureException.class})
+  ResponseEntity<ApiError> handleVersionConflict(RuntimeException exception) {
+    String message =
+        exception instanceof VersionConflictException
+            ? exception.getMessage()
+            : "Webhook endpoint changed; refresh it before retrying the update";
+    return response(HttpStatus.CONFLICT, "version_conflict", message, Map.of());
   }
 
   @ExceptionHandler(IllegalArgumentException.class)

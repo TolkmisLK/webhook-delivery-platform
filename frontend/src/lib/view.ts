@@ -1,4 +1,9 @@
-import type { DeliveryStatus } from "./types";
+import type { DeliveryStatus, Endpoint } from "./types";
+
+export function selectActiveEndpoint(endpoints: Endpoint[], currentId: string): string {
+  const active = endpoints.filter((endpoint) => endpoint.active);
+  return active.some((endpoint) => endpoint.id === currentId) ? currentId : active[0]?.id ?? "";
+}
 
 export function formatTimestamp(value: string, locale: "en" | "zh"): string {
   return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {

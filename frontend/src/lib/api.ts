@@ -25,6 +25,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+  setEndpointActive: (id: string, active: boolean, expectedVersion: number) =>
+    request<Endpoint>(`/api/endpoints/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ active, expectedVersion }),
+    }),
   publishEvent: (input: {
     endpointId: string;
     eventType: string;

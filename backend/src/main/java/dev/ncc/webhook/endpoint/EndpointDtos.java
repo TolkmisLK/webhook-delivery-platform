@@ -1,6 +1,8 @@
 package dev.ncc.webhook.endpoint;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.UUID;
@@ -14,8 +16,11 @@ public final class EndpointDtos {
       @NotBlank @Size(max = 2048) String url,
       @NotBlank @Size(min = 16, max = 512) String secret) {}
 
+  public record SetEndpointStatusRequest(
+      @NotNull Boolean active, @NotNull @PositiveOrZero Long expectedVersion) {}
+
   public record EndpointResponse(
-      UUID id, String name, String url, boolean active, Instant createdAt) {
+      UUID id, String name, String url, boolean active, long version, Instant createdAt) {
 
     static EndpointResponse from(WebhookEndpoint endpoint) {
       return new EndpointResponse(
@@ -23,6 +28,7 @@ public final class EndpointDtos {
           endpoint.getName(),
           endpoint.getUrl(),
           endpoint.isActive(),
+          endpoint.getVersion(),
           endpoint.getCreatedAt());
     }
   }

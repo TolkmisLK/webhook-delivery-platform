@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { StatusBadge } from "./components/StatusBadge";
 import { api } from "./lib/api";
 import type { Delivery, DeliveryDetail, DeliveryStats, Endpoint } from "./lib/types";
-import { formatDuration, formatTimestamp, parseEventData } from "./lib/view";
+import { formatDuration, formatTimestamp, parseEventData, selectActiveEndpoint } from "./lib/view";
 
 type Locale = "en" | "zh";
 
@@ -56,15 +56,20 @@ const copy = {
     noAttempts: "No committed attempt yet.",
     registered: "Registered endpoints",
     noEndpoints: "No endpoint registered yet.",
+    active: "ACTIVE",
+    inactive: "INACTIVE",
+    activate: "Activate",
+    deactivate: "Deactivate",
+    noActiveEndpoints: "No active endpoint",
   },
   zh: {
     eyebrow: "NCC · 基础设施公开项目",
-    title: "可靠 Webhook 投递平台",
-    intro: "通过签名请求、有限重试和可审查记录，完成持久化事件投递。",
+    title: "可靠 Webhook 推送平台",
+    intro: "通过签名请求、有限重试和可审查记录，可靠推送持久化事件。",
     live: "实时更新",
     reconnecting: "正在重连",
-    total: "全部投递",
-    succeeded: "投递成功",
+    total: "全部推送",
+    succeeded: "推送成功",
     retrying: "等待重试",
     dead: "死信任务",
     endpointTitle: "注册 Endpoint",
@@ -80,9 +85,9 @@ const copy = {
     idempotency: "幂等键",
     eventData: "事件数据",
     publish: "发布事件",
-    recentTitle: "最近投递",
+    recentTitle: "最近推送",
     refresh: "刷新",
-    empty: "暂无投递记录。请先注册 Endpoint，再发布第一个事件。",
+    empty: "暂无推送记录。请先注册 Endpoint，再发布第一个事件。",
     target: "目标",
     attempts: "尝试次数",
     response: "响应",
@@ -90,15 +95,20 @@ const copy = {
     action: "操作",
     replay: "重新投递",
     inspect: "查看详情",
-    historyTitle: "投递尝试时间线",
+    historyTitle: "推送尝试时间线",
     historyHelp: "这里只展示事务已提交的结果；签名密钥和请求签名不会被保存。",
     close: "关闭",
     attempt: "尝试",
     duration: "耗时",
     result: "结果",
-    noAttempts: "暂无已提交的投递尝试。",
+    noAttempts: "暂无已提交的推送尝试。",
     registered: "已注册 Endpoint",
     noEndpoints: "暂未注册 Endpoint。",
+    active: "已启用",
+    inactive: "已停用",
+    activate: "启用",
+    deactivate: "停用",
+    noActiveEndpoints: "暂无已启用 Endpoint",
   },
 } as const;
 
@@ -142,7 +152,7 @@ export function App() {
       setStats(nextStats);
       setEventForm((current) => ({
         ...current,
-        endpointId: current.endpointId || nextEndpoints[0]?.id || "",
+        endpointId: selectActiveEndpoint(nextEndpoints, current.endpointId),
       }));
       setError(null);
     } catch (loadError) {
@@ -190,9 +200,21 @@ export function App() {
         data: parseEventData(eventForm.data),
       });
       setNotice(result.duplicate
-        ? (locale === "zh" ? "幂等键已存在，返回原投递任务。" : "Existing idempotent delivery returned.")
+        ? (locale === "zh" ? "幂等键已存在，返回原推送任务。" : "Existing idempotent delivery returned.")
         : (locale === "zh" ? "事件已进入持久化队列。" : "Event accepted into the durable queue."));
       setEventForm((current) => ({ ...current, idempotencyKey: crypto.randomUUID() }));
+      await load();
+    });
+  }
+
+  async function setEndpointActive(endpoint: Endpoint) {
+    await run(async () => {
+      const updated = await api.setEndpointActive(endpoint.id, !endpoint.active, endpoint.version);
+      setNotice(
+        locale === "zh"
+          ? `Endpoint 已${updated.active ? "启用" : "停用"}。`
+          : `Endpoint ${updated.active ? "activated" : "deactivated"}.`,
+      );
       await load();
     });
   }
@@ -200,7 +222,7 @@ export function App() {
   async function replay(id: string) {
     await run(async () => {
       await api.replay(id);
-      setNotice(locale === "zh" ? "投递已重新进入队列。" : "Delivery queued for replay.");
+      setNotice(locale === "zh" ? "推送任务已重新进入队列。" : "Delivery queued for replay.");
       await load();
     });
   }
@@ -277,7 +299,7 @@ export function App() {
               <p>{t.eventHelp}</p>
             </div>
             <form onSubmit={publishEvent} className="form-grid">
-              <label>{t.endpoint}<select required value={eventForm.endpointId} onChange={(event) => setEventForm({ ...eventForm, endpointId: event.target.value })}><option value="" disabled>{t.endpoint}</option>{endpoints.map((endpoint) => <option value={endpoint.id} key={endpoint.id}>{endpoint.name}</option>)}</select></label>
+              <label>{t.endpoint}<select required value={eventForm.endpointId} onChange={(event) => setEventForm({ ...eventForm, endpointId: event.target.value })}><option value="" disabled>{endpoints.some((endpoint) => endpoint.active) ? t.endpoint : t.noActiveEndpoints}</option>{endpoints.filter((endpoint) => endpoint.active).map((endpoint) => <option value={endpoint.id} key={endpoint.id}>{endpoint.name}</option>)}</select></label>
               <label>{t.eventType}<input required maxLength={160} value={eventForm.eventType} onChange={(event) => setEventForm({ ...eventForm, eventType: event.target.value })} /></label>
               <label className="span-2">{t.idempotency}<input required maxLength={200} value={eventForm.idempotencyKey} onChange={(event) => setEventForm({ ...eventForm, idempotencyKey: event.target.value })} /></label>
               <label className="span-2">{t.eventData}<textarea required rows={5} value={eventForm.data} onChange={(event) => setEventForm({ ...eventForm, data: event.target.value })} /></label>
@@ -327,7 +349,7 @@ export function App() {
 
         <section className="panel endpoint-list">
           <div><p className="section-index">04</p><h2>{t.registered}</h2></div>
-          {endpoints.length === 0 ? <p>{t.noEndpoints}</p> : <ul>{endpoints.map((endpoint) => <li key={endpoint.id}><span><strong>{endpoint.name}</strong><small>{endpoint.url}</small></span><span className="endpoint-state">{endpoint.active ? "ACTIVE" : "INACTIVE"}</span></li>)}</ul>}
+          {endpoints.length === 0 ? <p>{t.noEndpoints}</p> : <ul>{endpoints.map((endpoint) => <li key={endpoint.id}><span><strong>{endpoint.name}</strong><small>{endpoint.url}</small></span><span className="endpoint-actions"><span className={`endpoint-state${endpoint.active ? "" : " inactive"}`}>{endpoint.active ? t.active : t.inactive}</span><button className="text-button" disabled={busy} type="button" onClick={() => void setEndpointActive(endpoint)}>{endpoint.active ? t.deactivate : t.activate}</button></span></li>)}</ul>}
         </section>
       </main>
 
