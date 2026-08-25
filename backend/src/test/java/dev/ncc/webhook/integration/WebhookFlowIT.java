@@ -16,6 +16,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -309,6 +310,30 @@ class WebhookFlowIT {
                 .contentType("application/json")
                 .content("{\"active\":false,\"expectedVersion\":0}"))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void exposesBoundedPrometheusQueueMetrics() throws Exception {
+    String exposition =
+        mockMvc
+            .perform(get("/actuator/prometheus"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    List<String> jobSeries =
+        exposition.lines().filter(line -> line.startsWith("webhook_delivery_jobs{")).toList();
+    assertThat(jobSeries)
+        .hasSize(5)
+        .allMatch(
+            line ->
+                line.matches(
+                    "webhook_delivery_jobs\\{status=\\\"(pending|processing|retry_scheduled|succeeded|dead)\\\"}"
+                        + " [0-9.Ee+-]+"));
+    assertThat(exposition).contains("webhook_delivery_oldest_runnable_age_seconds");
+    assertThat(String.join("\n", jobSeries))
+        .doesNotContain("endpoint", "delivery_id", "event_type", "url", "idempotency");
   }
 
   private void awaitSuccess(UUID deliveryId) throws InterruptedException {

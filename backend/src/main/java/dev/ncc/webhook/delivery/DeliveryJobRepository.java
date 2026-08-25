@@ -18,6 +18,34 @@ public interface DeliveryJobRepository extends JpaRepository<DeliveryJob, UUID> 
   List<DeliveryJob> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
   @Query(
+      """
+      select new dev.ncc.webhook.delivery.DeliveryStatusCount(job.status, count(job))
+      from DeliveryJob job
+      group by job.status
+      """)
+  List<DeliveryStatusCount> countByStatusGrouped();
+
+  @Query(
+      """
+      select min(job.nextAttemptAt)
+      from DeliveryJob job
+      where job.status in :statuses
+        and job.nextAttemptAt <= :now
+      """)
+  Optional<Instant> findOldestDueAt(
+      @Param("statuses") List<DeliveryStatus> statuses, @Param("now") Instant now);
+
+  @Query(
+      """
+      select min(job.lockedAt)
+      from DeliveryJob job
+      where job.status = :status
+        and job.lockedAt < :stale_before
+      """)
+  Optional<Instant> findOldestStaleLockAt(
+      @Param("status") DeliveryStatus status, @Param("stale_before") Instant staleBefore);
+
+  @Query(
       value =
           """
           select *

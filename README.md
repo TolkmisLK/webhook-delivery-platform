@@ -28,6 +28,7 @@ The first release intentionally uses a modular monolith and a PostgreSQL-backed 
 - After-commit Micrometer attempt counters, duration timers, and structured completion logs
 - Controlled transient-failure receiver for demonstrating retry recovery
 - Reversible Endpoint activation with optimistic version checks and stable conflict responses
+- Prometheus queue-health gauges with bounded status tags and runnable-job age
 
 ### Quick start
 
@@ -54,6 +55,14 @@ http://receiver:8090/hooks/flaky?failures=2
 ```
 
 The receiver returns HTTP `503` twice for each event and then succeeds. Use **Inspect** to review the committed attempt timeline. Runtime counters and timers are available through `/actuator/metrics/webhook.delivery.attempts` and `/actuator/metrics/webhook.delivery.duration`.
+
+For a reproducible Prometheus view, start the optional observability profile:
+
+```bash
+docker compose --profile observability up --build
+```
+
+Open [http://localhost:9090/targets](http://localhost:9090/targets) and query `webhook_delivery_jobs` or `webhook_delivery_oldest_runnable_age_seconds`. The Prometheus port is bound to `127.0.0.1`; the frontend proxies only health checks, not metrics. In production, keep all management endpoints on a private operations network.
 
 ### Delivery contract
 
@@ -95,7 +104,7 @@ The backend gate also checks Google Java Format and verifies the Spring Modulith
 
 ### Current scope
 
-`v0.3` adds reversible Endpoint activation, optimistic version checks, and operator controls that only publish to active targets. URL editing and secret rotation remain deferred until pending-job configuration snapshot semantics are defined.
+`v0.3` adds reversible Endpoint activation, optimistic version checks, active-target operator controls, and bounded Prometheus queue-health signals. URL editing and secret rotation remain deferred until pending-job configuration snapshot semantics are defined.
 
 ## 中文
 
@@ -120,6 +129,7 @@ Webhook Delivery Platform 是一个生产风格的全栈可靠事件投递参考
 - 事务提交后记录的 Micrometer 尝试计数、耗时指标与结构化完成日志
 - 用于演示重试恢复的可控瞬时失败 Receiver
 - 支持乐观版本校验与稳定冲突响应的可逆 Endpoint 启停控制
+- 使用固定状态标签与可运行任务年龄的 Prometheus 队列健康指标
 
 ### 快速开始
 
@@ -144,6 +154,14 @@ http://receiver:8090/hooks/flaky?failures=2
 ```
 
 Receiver 会针对每个事件先返回两次 HTTP `503`，随后成功。可通过“查看详情”审查已提交的尝试时间线；运行时计数与耗时指标可从 `/actuator/metrics/webhook.delivery.attempts` 和 `/actuator/metrics/webhook.delivery.duration` 查询。
+
+如需使用可复现的 Prometheus 视图，可启动可选的可观测性 Profile：
+
+```bash
+docker compose --profile observability up --build
+```
+
+访问 [http://localhost:9090/targets](http://localhost:9090/targets)，可查询 `webhook_delivery_jobs` 或 `webhook_delivery_oldest_runnable_age_seconds`。Prometheus 端口仅绑定 `127.0.0.1`，前端也只代理健康检查而不会公开指标。生产环境必须将所有管理端点限制在私有运维网络。
 
 注册 Endpoint 并发布示例事件后，可以观察任务从 `PENDING` 进入 `SUCCEEDED`。
 
@@ -190,7 +208,7 @@ PostgreSQL 集成测试会启动真实目标服务，通过 API 验证幂等接�
 
 ### 当前范围
 
-`v0.3` 增加可逆 Endpoint 启停、乐观版本校验，以及只向已启用目标发布事件的运维控制。Endpoint URL 编辑与密钥轮换继续暂缓，直至待处理任务的配置快照语义明确。
+`v0.3` 增加可逆 Endpoint 启停、乐观版本校验、只向已启用目标发布事件的运维控制，以及低基数 Prometheus 队列健康信号。Endpoint URL 编辑与密钥轮换继续暂缓，直至待处理任务的配置快照语义明确。
 
 ## License
 

@@ -12,6 +12,7 @@ public class DeliveryProperties {
   private Duration baseRetryDelay = Duration.ofSeconds(5);
   private Duration maxRetryDelay = Duration.ofMinutes(5);
   private Duration leaseTimeout = Duration.ofSeconds(30);
+  private Duration metricsRefreshInterval = Duration.ofSeconds(5);
   private int batchSize = 10;
   private int workerConcurrency = 8;
   private int maxAttempts = 5;
@@ -25,6 +26,7 @@ public class DeliveryProperties {
     requirePositive(baseRetryDelay, "base retry delay");
     requirePositive(maxRetryDelay, "maximum retry delay");
     requirePositive(leaseTimeout, "lease timeout");
+    requirePositive(metricsRefreshInterval, "metrics refresh interval");
     if (baseRetryDelay.compareTo(maxRetryDelay) > 0) {
       throw new IllegalStateException("Base retry delay cannot exceed the maximum retry delay");
     }
@@ -83,6 +85,14 @@ public class DeliveryProperties {
 
   public void setLeaseTimeout(Duration leaseTimeout) {
     this.leaseTimeout = leaseTimeout;
+  }
+
+  public Duration getMetricsRefreshInterval() {
+    return metricsRefreshInterval;
+  }
+
+  public void setMetricsRefreshInterval(Duration metricsRefreshInterval) {
+    this.metricsRefreshInterval = metricsRefreshInterval;
   }
 
   public int getBatchSize() {
