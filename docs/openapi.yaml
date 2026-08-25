@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Webhook Delivery Platform API
-  version: 0.1.0
+  version: 0.2.0
   license:
     name: MIT
     identifier: MIT
@@ -96,6 +96,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeliveryStats"
+  /api/deliveries/{deliveryId}:
+    get:
+      operationId: getDeliveryDetail
+      summary: Inspect delivery attempts / 查看投递尝试
+      parameters:
+        - $ref: "#/components/parameters/DeliveryId"
+      responses:
+        "200":
+          description: Delivery job and its committed attempt timeline.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliveryDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /api/deliveries/{deliveryId}/replay:
     post:
       operationId: replayDelivery
@@ -234,6 +249,27 @@ components:
           type: object
           additionalProperties:
             type: integer
+    DeliveryDetail:
+      type: object
+      required: [delivery, attempts]
+      properties:
+        delivery: { $ref: "#/components/schemas/Delivery" }
+        attempts:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeliveryAttempt"
+    DeliveryAttempt:
+      type: object
+      required: [attemptNumber, outcome, durationMs, startedAt, finishedAt]
+      properties:
+        attemptNumber: { type: integer, minimum: 1 }
+        outcome: { $ref: "#/components/schemas/DeliveryStatus" }
+        statusCode: { type: [integer, "null"] }
+        errorMessage: { type: [string, "null"] }
+        responseExcerpt: { type: [string, "null"] }
+        durationMs: { type: integer, minimum: 0 }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time }
     DeliveryStatus:
       type: string
       enum: [PENDING, PROCESSING, RETRY_SCHEDULED, SUCCEEDED, DEAD]

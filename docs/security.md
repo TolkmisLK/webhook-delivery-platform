@@ -33,7 +33,7 @@
 
 ### Deployment boundary
 
-`v0.1` is a single-operator engineering console. Deploy it behind an authenticated reverse proxy or a private network boundary. Native account and authorization policy are planned before any shared deployment.
+The current release is a single-operator engineering console. Deploy it behind an authenticated reverse proxy or a private network boundary. Native account and authorization policy are planned before any shared deployment.
 
 ### SSRF residual risk
 
@@ -78,6 +78,6 @@ Consumers should:
 
 `APP_SECURITY_MASTER_KEY` 是 Base64 编码的 32 字节密钥。更换密钥时需要执行受控迁移，先用旧密钥解密，再用新密钥加密已有 Endpoint 数据。
 
-`v0.1` 是单操作者工程控制台。部署时应放在带认证的反向代理或私有网络边界之后；在支持多人共享部署前，将增加系统自身的账号与授权策略。
+当前版本是单操作者工程控制台。部署时应放在带认证的反向代理或私有网络边界之后；在支持多人共享部署前，将增加系统自身的账号与授权策略。
 
 Docker 演示环境使用 `APP_SECURITY_ALLOW_PRIVATE_TARGETS=true` 访问内部 Receiver；生产环境保持为 `false`，并建议通过网络出口策略或专用 Outbound Proxy 进一步控制实际连接地址。

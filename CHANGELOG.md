@@ -6,6 +6,16 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-25
+
+### Added / 新增
+
+- Delivery detail API and bilingual committed-attempt timeline.
+- After-commit Micrometer counters, duration timers, and structured completion logs.
+- Controlled transient-failure receiver and retry-recovery integration coverage.
+
+## [0.1.0] - 2026-08-25
+
 ### Added / 新增
 
 - Java 21 and Spring Boot 4.1 modular backend.

@@ -69,6 +69,14 @@ This creates **at-least-once delivery**. A target may receive a duplicate if the
 
 Each attempt stores the status code, bounded response excerpt, duration, timestamps, and classified error. The signing secret and request signature are never stored in attempt records.
 
+### Diagnostics and telemetry
+
+`GET /api/deliveries/{deliveryId}` returns the delivery summary and its attempts in chronological order. The projection deliberately excludes the event body, signing secret, and generated signature while retaining the bounded response excerpt and classified error needed for diagnosis.
+
+An attempt-completed application event is published inside the outcome transaction. Micrometer counters, duration timers, and the structured completion log consume it with an `AFTER_COMMIT` listener. A rolled-back outcome therefore cannot appear as a completed attempt in runtime telemetry.
+
+The demo receiver exposes `/hooks/flaky?failures=N` for a bounded, deterministic transient-failure scenario. It verifies the signature before injecting HTTP `503` responses and succeeds after the configured failure budget, allowing the same retry path to be inspected without an external service.
+
 ### Consistency decisions
 
 - Event body is rendered once and reused byte-for-byte across attempts.
@@ -123,3 +131,11 @@ Worker 使用 `FOR UPDATE SKIP LOCKED` 抢占到期任务。事务只负责将�
 | 重试次数耗尽 | `DEAD` |
 
 每次尝试记录状态码、有限长度响应摘要、耗时、时间和错误分类。签名密钥与请求签名不会写入尝试记录。
+
+### 诊断与遥测
+
+`GET /api/deliveries/{deliveryId}` 按时间顺序返回任务摘要及其投递尝试。该投影不会暴露事件体、签名密钥或生成后的签名，只保留诊断所需的有限响应摘要与错误分类。
+
+结果事务内部会发布“尝试完成”应用事件，Micrometer 计数、耗时指标与结构化完成日志通过 `AFTER_COMMIT` Listener 消费该事件。因此，事务回滚的结果不会被错误记录为已经完成的运行时遥测。
+
+演示 Receiver 提供 `/hooks/flaky?failures=N`，用于制造有上限、可重复的瞬时故障。它会先验证签名，再按配置返回 HTTP `503`，耗尽失败预算后恢复成功，从而无需外部服务即可审查同一条重试链路。
