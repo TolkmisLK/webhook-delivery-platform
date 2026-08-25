@@ -1,4 +1,4 @@
-import type { ApiError, Delivery, DeliveryStats, Endpoint } from "./types";
+import type { ApiError, Delivery, DeliveryDetail, DeliveryStats, Endpoint } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -36,6 +36,7 @@ export const api = {
       body: JSON.stringify(input),
     }),
   listDeliveries: () => request<Delivery[]>("/api/deliveries?limit=50"),
+  getDelivery: (id: string) => request<DeliveryDetail>(`/api/deliveries/${id}`),
   getStats: () => request<DeliveryStats>("/api/deliveries/stats"),
   replay: (id: string) =>
     request<Delivery>(`/api/deliveries/${id}/replay`, { method: "POST" }),

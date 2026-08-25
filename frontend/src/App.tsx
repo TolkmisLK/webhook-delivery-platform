@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { StatusBadge } from "./components/StatusBadge";
 import { api } from "./lib/api";
-import type { Delivery, DeliveryStats, Endpoint } from "./lib/types";
-import { formatTimestamp, parseEventData } from "./lib/view";
+import type { Delivery, DeliveryDetail, DeliveryStats, Endpoint } from "./lib/types";
+import { formatDuration, formatTimestamp, parseEventData } from "./lib/view";
 
 type Locale = "en" | "zh";
 
@@ -46,6 +46,14 @@ const copy = {
     updated: "Updated",
     action: "Action",
     replay: "Replay",
+    inspect: "Inspect",
+    historyTitle: "Attempt timeline",
+    historyHelp: "Committed outcomes only. Signing secrets and request signatures are never stored.",
+    close: "Close",
+    attempt: "Attempt",
+    duration: "Duration",
+    result: "Result",
+    noAttempts: "No committed attempt yet.",
     registered: "Registered endpoints",
     noEndpoints: "No endpoint registered yet.",
   },
@@ -81,6 +89,14 @@ const copy = {
     updated: "更新时间",
     action: "操作",
     replay: "重新投递",
+    inspect: "查看详情",
+    historyTitle: "投递尝试时间线",
+    historyHelp: "这里只展示事务已提交的结果；签名密钥和请求签名不会被保存。",
+    close: "关闭",
+    attempt: "尝试",
+    duration: "耗时",
+    result: "结果",
+    noAttempts: "暂无已提交的投递尝试。",
     registered: "已注册 Endpoint",
     noEndpoints: "暂未注册 Endpoint。",
   },
@@ -96,6 +112,7 @@ export function App() {
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [stats, setStats] = useState<DeliveryStats>(emptyStats);
+  const [selectedDelivery, setSelectedDelivery] = useState<DeliveryDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -188,6 +205,12 @@ export function App() {
     });
   }
 
+  async function inspect(id: string) {
+    await run(async () => {
+      setSelectedDelivery(await api.getDelivery(id));
+    });
+  }
+
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setError(null);
@@ -267,8 +290,38 @@ export function App() {
           <div className="table-heading"><div><p className="section-index">03</p><h2>{t.recentTitle}</h2></div><button className="ghost-button" type="button" onClick={() => void load()}>{t.refresh}</button></div>
           {deliveries.length === 0 ? <p className="empty-state">{t.empty}</p> : (
             <div className="table-wrap"><table><thead><tr><th>Event</th><th>{t.target}</th><th>Status</th><th>{t.attempts}</th><th>{t.response}</th><th>{t.updated}</th><th>{t.action}</th></tr></thead>
-              <tbody>{deliveries.map((delivery) => <tr key={delivery.id}><td><strong>{delivery.eventType}</strong><code>{delivery.eventId.slice(0, 8)}</code></td><td><strong>{delivery.endpointName}</strong><small title={delivery.endpointUrl}>{delivery.endpointUrl}</small></td><td><StatusBadge status={delivery.status} /></td><td>{delivery.attemptCount} / {delivery.maxAttempts}</td><td>{delivery.lastStatusCode ?? delivery.lastError ?? "—"}</td><td>{formatTimestamp(delivery.updatedAt, locale)}</td><td><button className="text-button" disabled={busy || delivery.status === "PROCESSING"} type="button" onClick={() => void replay(delivery.id)}>{t.replay}</button></td></tr>)}</tbody>
+              <tbody>{deliveries.map((delivery) => <tr key={delivery.id}><td><strong>{delivery.eventType}</strong><code>{delivery.eventId.slice(0, 8)}</code></td><td><strong>{delivery.endpointName}</strong><small title={delivery.endpointUrl}>{delivery.endpointUrl}</small></td><td><StatusBadge status={delivery.status} /></td><td>{delivery.attemptCount} / {delivery.maxAttempts}</td><td>{delivery.lastStatusCode ?? delivery.lastError ?? "—"}</td><td>{formatTimestamp(delivery.updatedAt, locale)}</td><td><div className="row-actions"><button className="text-button" disabled={busy} type="button" onClick={() => void inspect(delivery.id)}>{t.inspect}</button><button className="text-button" disabled={busy || delivery.status === "PROCESSING"} type="button" onClick={() => void replay(delivery.id)}>{t.replay}</button></div></td></tr>)}</tbody>
             </table></div>
+          )}
+          {selectedDelivery && (
+            <section className="attempt-detail" aria-labelledby="attempt-detail-title">
+              <div className="attempt-detail-heading">
+                <div>
+                  <p className="section-index">{selectedDelivery.delivery.id.slice(0, 8)}</p>
+                  <h3 id="attempt-detail-title">{t.historyTitle}</h3>
+                  <p>{t.historyHelp}</p>
+                </div>
+                <button className="ghost-button" type="button" onClick={() => setSelectedDelivery(null)}>{t.close}</button>
+              </div>
+              {selectedDelivery.attempts.length === 0 ? <p className="empty-state">{t.noAttempts}</p> : (
+                <ol className="attempt-timeline">
+                  {selectedDelivery.attempts.map((attempt) => (
+                    <li key={attempt.attemptNumber}>
+                      <div className="attempt-marker">{attempt.attemptNumber}</div>
+                      <div className="attempt-content">
+                        <div className="attempt-summary"><strong>{t.attempt} {attempt.attemptNumber}</strong><StatusBadge status={attempt.outcome} /></div>
+                        <dl>
+                          <div><dt>HTTP</dt><dd>{attempt.statusCode ?? "—"}</dd></div>
+                          <div><dt>{t.duration}</dt><dd>{formatDuration(attempt.durationMs)}</dd></div>
+                          <div><dt>{t.updated}</dt><dd>{formatTimestamp(attempt.finishedAt, locale)}</dd></div>
+                          <div className="attempt-result"><dt>{t.result}</dt><dd>{attempt.errorMessage ?? attempt.responseExcerpt ?? "—"}</dd></div>
+                        </dl>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
           )}
         </section>
 

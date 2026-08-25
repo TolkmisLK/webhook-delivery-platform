@@ -10,6 +10,11 @@ export function formatTimestamp(value: string, locale: "en" | "zh"): string {
   }).format(new Date(value));
 }
 
+export function formatDuration(value: number): string {
+  if (value < 1000) return `${value} ms`;
+  return `${(value / 1000).toFixed(value < 10_000 ? 1 : 0)} s`;
+}
+
 export function statusTone(status: DeliveryStatus): "neutral" | "active" | "success" | "danger" {
   if (status === "SUCCEEDED") return "success";
   if (status === "DEAD") return "danger";
