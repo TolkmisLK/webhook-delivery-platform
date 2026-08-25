@@ -6,6 +6,8 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-25
+
 ### Added / 新增
 
 - Versioned Endpoint activation and deactivation with stable HTTP 409 conflict responses.
