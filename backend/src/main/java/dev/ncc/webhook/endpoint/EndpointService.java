@@ -1,13 +1,17 @@
 package dev.ncc.webhook.endpoint;
 
+import dev.ncc.webhook.common.NotFoundException;
+import dev.ncc.webhook.common.VersionConflictException;
 import dev.ncc.webhook.config.SecretCipher;
 import dev.ncc.webhook.config.UrlSafetyPolicy;
 import dev.ncc.webhook.endpoint.EndpointDtos.CreateEndpointRequest;
 import dev.ncc.webhook.endpoint.EndpointDtos.EndpointResponse;
+import dev.ncc.webhook.endpoint.EndpointDtos.SetEndpointStatusRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,16 +23,19 @@ public class EndpointService {
   private final UrlSafetyPolicy urlSafetyPolicy;
   private final SecretCipher secretCipher;
   private final Clock clock;
+  private final ApplicationEventPublisher events;
 
   public EndpointService(
       WebhookEndpointRepository repository,
       UrlSafetyPolicy urlSafetyPolicy,
       SecretCipher secretCipher,
-      Clock clock) {
+      Clock clock,
+      ApplicationEventPublisher events) {
     this.repository = repository;
     this.urlSafetyPolicy = urlSafetyPolicy;
     this.secretCipher = secretCipher;
     this.clock = clock;
+    this.events = events;
   }
 
   @Transactional
@@ -49,5 +56,26 @@ public class EndpointService {
     return repository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")).stream()
         .map(EndpointResponse::from)
         .toList();
+  }
+
+  @Transactional
+  public EndpointResponse setStatus(UUID endpointId, SetEndpointStatusRequest request) {
+    WebhookEndpoint endpoint =
+        repository
+            .findById(endpointId)
+            .orElseThrow(() -> new NotFoundException("Webhook endpoint was not found"));
+    if (endpoint.getVersion() != request.expectedVersion()) {
+      throw new VersionConflictException(
+          "Webhook endpoint changed; refresh it before retrying the update");
+    }
+    if (endpoint.isActive() == request.active()) {
+      return EndpointResponse.from(endpoint);
+    }
+
+    endpoint.setActive(request.active());
+    WebhookEndpoint saved = repository.saveAndFlush(endpoint);
+    events.publishEvent(
+        new EndpointStatusChanged(saved.getId(), saved.isActive(), saved.getVersion()));
+    return EndpointResponse.from(saved);
   }
 }

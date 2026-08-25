@@ -65,4 +65,12 @@ public class WebhookEndpoint {
   public Instant getCreatedAt() {
     return createdAt;
   }
+
+  public long getVersion() {
+    return version;
+  }
+
+  void setActive(boolean active) {
+    this.active = active;
+  }
 }

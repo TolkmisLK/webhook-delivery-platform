@@ -10,6 +10,7 @@ export interface Endpoint {
   name: string;
   url: string;
   active: boolean;
+  version: number;
   createdAt: string;
 }
 

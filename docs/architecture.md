@@ -21,7 +21,7 @@ The application is a modular monolith with one deployable backend and one static
 
 | Module | Responsibility |
 | --- | --- |
-| `endpoint` | Endpoint registration, URL policy, encrypted signing secret |
+| `endpoint` | Endpoint registration, versioned activation, URL policy, encrypted signing secret |
 | `event` | Idempotent event acceptance and deterministic request body |
 | `delivery` | Job lease, HTTP execution, retry policy, attempts, replay, SSE |
 | `config` | Typed configuration, AES-GCM, HTTP client, clock |
@@ -81,6 +81,8 @@ The demo receiver exposes `/hooks/flaky?failures=N` for a bounded, deterministic
 
 - Event body is rendered once and reused byte-for-byte across attempts.
 - Endpoint secrets are encrypted before persistence and decrypted only for delivery.
+- Endpoint activation changes require the version last observed by the operator; stale writes return HTTP `409`.
+- Deactivation blocks new event acceptance while already accepted delivery jobs continue under the existing immutable-event contract.
 - A manual replay extends the attempt budget without resetting the historical attempt sequence.
 - Database time is stored as UTC `timestamptz`; application time comes from an injected `Clock`.
 - Frontend updates use SSE, while a manual refresh remains available as a recovery path.
@@ -95,7 +97,7 @@ The demo receiver exposes `/hooks/flaky?failures=N` for a bounded, deterministic
 
 | 模块 | 职责 |
 | --- | --- |
-| `endpoint` | Endpoint 注册、URL 策略和加密签名密钥 |
+| `endpoint` | Endpoint 注册、带版本的启停控制、URL 策略和加密签名密钥 |
 | `event` | 幂等事件接收与确定性请求体生成 |
 | `delivery` | 任务租约、HTTP 投递、重试、尝试记录、重投和 SSE |
 | `config` | 类型化配置、AES-GCM、HTTP Client 与时间源 |
@@ -139,3 +141,9 @@ Worker 使用 `FOR UPDATE SKIP LOCKED` 抢占到期任务。事务只负责将�
 结果事务内部会发布“尝试完成”应用事件，Micrometer 计数、耗时指标与结构化完成日志通过 `AFTER_COMMIT` Listener 消费该事件。因此，事务回滚的结果不会被错误记录为已经完成的运行时遥测。
 
 演示 Receiver 提供 `/hooks/flaky?failures=N`，用于制造有上限、可重复的瞬时故障。它会先验证签名，再按配置返回 HTTP `503`，耗尽失败预算后恢复成功，从而无需外部服务即可审查同一条重试链路。
+
+### Endpoint 生命周期一致性
+
+- Endpoint 启停变更必须携带运维端最后观察到的版本；陈旧写入返回 HTTP `409`。
+- 停用会阻止接收新事件，已经接收的投递任务仍按现有不可变事件契约继续执行。
+- 状态变更日志仅在事务提交后产生，回滚操作不会形成已完成的运行证据。

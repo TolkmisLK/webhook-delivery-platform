@@ -27,6 +27,7 @@ The first release intentionally uses a modular monolith and a PostgreSQL-backed 
 - Delivery-attempt detail API and bilingual timeline for committed outcomes
 - After-commit Micrometer attempt counters, duration timers, and structured completion logs
 - Controlled transient-failure receiver for demonstrating retry recovery
+- Reversible Endpoint activation with optimistic version checks and stable conflict responses
 
 ### Quick start
 
@@ -94,7 +95,7 @@ The backend gate also checks Google Java Format and verifies the Spring Modulith
 
 ### Current scope
 
-`v0.2` adds committed attempt diagnostics, after-commit metrics, and a controlled transient-failure scenario. Planned work includes endpoint lifecycle management, metrics dashboards, concurrency benchmarks, and broader fault-injection coverage.
+`v0.3` adds reversible Endpoint activation, optimistic version checks, and operator controls that only publish to active targets. URL editing and secret rotation remain deferred until pending-job configuration snapshot semantics are defined.
 
 ## 中文
 
@@ -118,6 +119,7 @@ Webhook Delivery Platform 是一个生产风格的全栈可靠事件投递参考
 - 投递详情 API，以及展示已提交结果的中英双语尝试时间线
 - 事务提交后记录的 Micrometer 尝试计数、耗时指标与结构化完成日志
 - 用于演示重试恢复的可控瞬时失败 Receiver
+- 支持乐观版本校验与稳定冲突响应的可逆 Endpoint 启停控制
 
 ### 快速开始
 
@@ -188,7 +190,7 @@ PostgreSQL 集成测试会启动真实目标服务，通过 API 验证幂等接�
 
 ### 当前范围
 
-`v0.2` 增加已提交尝试的诊断信息、事务提交后的运行指标，以及可控瞬时故障场景。后续计划包括 Endpoint 生命周期管理、指标面板、并发基准测试和更完整的故障注入覆盖。
+`v0.3` 增加可逆 Endpoint 启停、乐观版本校验，以及只向已启用目标发布事件的运维控制。Endpoint URL 编辑与密钥轮换继续暂缓，直至待处理任务的配置快照语义明确。
 
 ## License
 

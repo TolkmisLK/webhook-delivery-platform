@@ -581,6 +581,17 @@ td code {
   letter-spacing: 0.08em;
 }
 
+.endpoint-state.inactive {
+  color: var(--muted);
+}
+
+.endpoint-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  white-space: nowrap;
+}
+
 footer {
   min-height: 84px;
   display: flex;

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Webhook Delivery Platform API
-  version: 0.2.0
+  version: 0.3.0
   license:
     name: MIT
     identifier: MIT
@@ -43,6 +43,31 @@ paths:
                 $ref: "#/components/schemas/Endpoint"
         "400":
           $ref: "#/components/responses/BadRequest"
+  /api/endpoints/{endpointId}/status:
+    patch:
+      operationId: setEndpointStatus
+      summary: Activate or deactivate an endpoint / 启用或停用 Endpoint
+      parameters:
+        - $ref: "#/components/parameters/EndpointId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetEndpointStatus"
+      responses:
+        "200":
+          description: Endpoint status updated or already in the requested state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Endpoint"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/VersionConflict"
   /api/events:
     post:
       operationId: publishEvent
@@ -141,6 +166,13 @@ paths:
                 type: string
 components:
   parameters:
+    EndpointId:
+      name: endpointId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     DeliveryId:
       name: deliveryId
       in: path
@@ -157,6 +189,12 @@ components:
             $ref: "#/components/schemas/ApiError"
     NotFound:
       description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    VersionConflict:
+      description: The endpoint version is stale and must be refreshed.
       content:
         application/json:
           schema:
@@ -178,14 +216,21 @@ components:
           minLength: 16
           maxLength: 512
           writeOnly: true
+    SetEndpointStatus:
+      type: object
+      required: [active, expectedVersion]
+      properties:
+        active: { type: boolean }
+        expectedVersion: { type: integer, minimum: 0 }
     Endpoint:
       type: object
-      required: [id, name, url, active, createdAt]
+      required: [id, name, url, active, version, createdAt]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
         url: { type: string, format: uri }
         active: { type: boolean }
+        version: { type: integer, minimum: 0 }
         createdAt: { type: string, format: date-time }
     PublishEvent:
       type: object

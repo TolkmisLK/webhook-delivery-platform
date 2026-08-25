@@ -2,6 +2,7 @@ package dev.ncc.webhook.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -218,6 +219,96 @@ class WebhookFlowIT {
     assertThat(attempts.get(1).get("outcome").asText()).isEqualTo("RETRY_SCHEDULED");
     assertThat(attempts.get(2).get("outcome").asText()).isEqualTo("SUCCEEDED");
     assertThat(FLAKY_COUNT.get()).isEqualTo(3);
+  }
+
+  @Test
+  void versionsEndpointActivationAndRejectsStaleUpdates() throws Exception {
+    String endpointJson =
+        mockMvc
+            .perform(
+                post("/api/endpoints")
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "name": "lifecycle target",
+                          "url": "http://127.0.0.1:%d/hooks",
+                          "secret": "integration-secret"
+                        }
+                        """
+                            .formatted(TARGET.getAddress().getPort())))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    var created = jsonMapper.readTree(endpointJson);
+    String endpointId = created.get("id").asText();
+    assertThat(created.get("active").asBoolean()).isTrue();
+    assertThat(created.get("version").asLong()).isZero();
+
+    String inactiveJson =
+        mockMvc
+            .perform(
+                patch("/api/endpoints/{id}/status", endpointId)
+                    .contentType("application/json")
+                    .content("{\"active\":false,\"expectedVersion\":0}"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    var inactive = jsonMapper.readTree(inactiveJson);
+    assertThat(inactive.get("active").asBoolean()).isFalse();
+    assertThat(inactive.get("version").asLong()).isEqualTo(1);
+
+    mockMvc
+        .perform(
+            post("/api/events")
+                .contentType("application/json")
+                .content(
+                    """
+                    {
+                      "endpointId": "%s",
+                      "eventType": "demo.inactive",
+                      "idempotencyKey": "inactive-endpoint",
+                      "data": {"result": "blocked"}
+                    }
+                    """
+                        .formatted(endpointId)))
+        .andExpect(status().isBadRequest());
+
+    String conflictJson =
+        mockMvc
+            .perform(
+                patch("/api/endpoints/{id}/status", endpointId)
+                    .contentType("application/json")
+                    .content("{\"active\":true,\"expectedVersion\":0}"))
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(jsonMapper.readTree(conflictJson).get("code").asText())
+        .isEqualTo("version_conflict");
+
+    String activeJson =
+        mockMvc
+            .perform(
+                patch("/api/endpoints/{id}/status", endpointId)
+                    .contentType("application/json")
+                    .content("{\"active\":true,\"expectedVersion\":1}"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    var active = jsonMapper.readTree(activeJson);
+    assertThat(active.get("active").asBoolean()).isTrue();
+    assertThat(active.get("version").asLong()).isEqualTo(2);
+
+    mockMvc
+        .perform(
+            patch("/api/endpoints/{id}/status", UUID.randomUUID())
+                .contentType("application/json")
+                .content("{\"active\":false,\"expectedVersion\":0}"))
+        .andExpect(status().isNotFound());
   }
 
   private void awaitSuccess(UUID deliveryId) throws InterruptedException {
