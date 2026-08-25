@@ -23,7 +23,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       probes:
@@ -36,6 +36,7 @@ app:
     base-retry-delay: ${APP_DELIVERY_BASE_RETRY_DELAY:5s}
     max-retry-delay: ${APP_DELIVERY_MAX_RETRY_DELAY:5m}
     lease-timeout: ${APP_DELIVERY_LEASE_TIMEOUT:30s}
+    metrics-refresh-interval: ${APP_DELIVERY_METRICS_REFRESH_INTERVAL:5s}
     batch-size: ${APP_DELIVERY_BATCH_SIZE:10}
     worker-concurrency: ${APP_DELIVERY_WORKER_CONCURRENCY:8}
     max-attempts: ${APP_DELIVERY_MAX_ATTEMPTS:5}

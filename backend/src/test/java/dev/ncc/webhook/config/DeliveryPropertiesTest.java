@@ -17,4 +17,14 @@ class DeliveryPropertiesTest {
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Lease timeout");
   }
+
+  @Test
+  void requiresAPositiveMetricsRefreshInterval() {
+    DeliveryProperties properties = new DeliveryProperties();
+    properties.setMetricsRefreshInterval(Duration.ZERO);
+
+    assertThatThrownBy(properties::validate)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("metrics refresh interval");
+  }
 }
