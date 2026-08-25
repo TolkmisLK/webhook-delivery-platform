@@ -1,5 +1,6 @@
 package dev.ncc.webhook.delivery;
 
+import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryDetailResponse;
 import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryResponse;
 import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryStats;
 import java.util.List;
@@ -33,6 +34,11 @@ public class DeliveryController {
   @GetMapping("/stats")
   DeliveryStats stats() {
     return service.stats();
+  }
+
+  @GetMapping("/{id}")
+  DeliveryDetailResponse detail(@PathVariable UUID id) {
+    return service.detail(id);
   }
 
   @PostMapping("/{id}/replay")
