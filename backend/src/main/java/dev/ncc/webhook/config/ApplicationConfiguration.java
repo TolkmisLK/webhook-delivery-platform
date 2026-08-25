@@ -14,7 +14,7 @@ public class ApplicationConfiguration {
   }
 
   @Bean
-  HttpClient webhookHttpClient(DeliveryProperties properties) {
+  HttpClient deliveryHttpClient(DeliveryProperties properties) {
     return HttpClient.newBuilder()
         .connectTimeout(properties.getRequestTimeout())
         .followRedirects(HttpClient.Redirect.NEVER)
