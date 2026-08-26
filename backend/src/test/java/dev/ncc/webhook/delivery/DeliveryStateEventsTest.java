@@ -37,8 +37,7 @@ class DeliveryStateEventsTest {
     DeliveryAttemptRepository attempts = mock(DeliveryAttemptRepository.class);
     WebhookEventRepository webhookEvents = mock(WebhookEventRepository.class);
     WebhookEndpointRepository endpoints = mock(WebhookEndpointRepository.class);
-    DeliveryJob job =
-        pendingJob();
+    DeliveryJob job = pendingJob();
     WebhookEvent event = mock(WebhookEvent.class);
     WebhookEndpoint endpoint = mock(WebhookEndpoint.class);
     when(jobs.findByIdForUpdate(job.getId())).thenReturn(Optional.of(job));
@@ -67,10 +66,8 @@ class DeliveryStateEventsTest {
   @Test
   void distinguishesWorkerClaimsFromStaleLeaseRecovery() {
     DeliveryJobRepository jobs = mock(DeliveryJobRepository.class);
-    DeliveryJob pending =
-        pendingJob();
-    DeliveryJob stale =
-        pendingJob();
+    DeliveryJob pending = pendingJob();
+    DeliveryJob stale = pendingJob();
     stale.claim("stale-worker", NOW.minusSeconds(60));
     when(jobs.findClaimable(any(), any(), anyInt())).thenReturn(List.of(pending, stale));
 

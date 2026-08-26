@@ -133,9 +133,7 @@ class WebhookFlowIT {
         .isEqualTo("http://127.0.0.1:%d/hooks".formatted(TARGET.getAddress().getPort()));
     assertThat(
             jdbcTemplate.queryForObject(
-                "select encrypted_secret from delivery_job where id = ?",
-                String.class,
-                deliveryId))
+                "select encrypted_secret from delivery_job where id = ?", String.class, deliveryId))
         .isNotBlank()
         .doesNotContain("integration-secret");
 

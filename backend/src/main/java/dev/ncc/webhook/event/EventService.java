@@ -78,11 +78,7 @@ public class EventService {
 
     AcceptedDelivery delivery =
         deliverySubmission.ensureScheduled(
-            event.getId(),
-            endpoint.getId(),
-            endpoint.getUrl(),
-            endpoint.getEncryptedSecret(),
-            now);
+            event.getId(), endpoint.getId(), endpoint.getUrl(), endpoint.getEncryptedSecret(), now);
     return response(event, delivery, false);
   }
 

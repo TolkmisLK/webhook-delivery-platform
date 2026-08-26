@@ -7,11 +7,7 @@ import java.util.UUID;
 public interface DeliverySubmission {
 
   AcceptedDelivery ensureScheduled(
-      UUID eventId,
-      UUID endpointId,
-      String targetUrl,
-      String encryptedSecret,
-      Instant acceptedAt);
+      UUID eventId, UUID endpointId, String targetUrl, String encryptedSecret, Instant acceptedAt);
 
   record AcceptedDelivery(UUID id, String status) {}
 }

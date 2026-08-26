@@ -27,11 +27,7 @@ class DeliverySubmissionService implements DeliverySubmission {
   @Override
   @Transactional
   public AcceptedDelivery ensureScheduled(
-      UUID eventId,
-      UUID endpointId,
-      String targetUrl,
-      String encryptedSecret,
-      Instant acceptedAt) {
+      UUID eventId, UUID endpointId, String targetUrl, String encryptedSecret, Instant acceptedAt) {
     return repository
         .findByEventId(eventId)
         .map(this::accepted)
