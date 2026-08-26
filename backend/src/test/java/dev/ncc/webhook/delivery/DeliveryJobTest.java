@@ -10,11 +10,20 @@ import org.junit.jupiter.api.Test;
 class DeliveryJobTest {
 
   private static final Instant NOW = Instant.parse("2026-08-24T00:00:00Z");
+  private static final String TARGET_URL = "https://example.com/hooks";
+  private static final String ENCRYPTED_SECRET = "encrypted-secret";
 
   @Test
   void preservesAttemptSequenceWhenADeadDeliveryIsReplayed() {
     DeliveryJob job =
-        DeliveryJob.pending(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 3, NOW);
+        DeliveryJob.pending(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            TARGET_URL,
+            ENCRYPTED_SECRET,
+            3,
+            NOW);
     job.claim("worker-a", NOW);
     job.failPermanently(3, 400, "invalid target response", NOW);
 
@@ -29,7 +38,14 @@ class DeliveryJobTest {
   @Test
   void refusesToReplayAJobThatIsBeingProcessed() {
     DeliveryJob job =
-        DeliveryJob.pending(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 3, NOW);
+        DeliveryJob.pending(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            TARGET_URL,
+            ENCRYPTED_SECRET,
+            3,
+            NOW);
     job.claim("worker-a", NOW);
 
     assertThatThrownBy(() -> job.replay(NOW, 3))
@@ -40,7 +56,14 @@ class DeliveryJobTest {
   @Test
   void cancelsQueuedJobsAndKeepsRepeatedCancellationIdempotent() {
     DeliveryJob job =
-        DeliveryJob.pending(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 3, NOW);
+        DeliveryJob.pending(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            TARGET_URL,
+            ENCRYPTED_SECRET,
+            3,
+            NOW);
 
     assertThat(job.cancel(NOW.plusSeconds(1))).isTrue();
     assertThat(job.getStatus()).isEqualTo(DeliveryStatus.CANCELED);
@@ -55,7 +78,14 @@ class DeliveryJobTest {
   @Test
   void cancelsAJobWaitingForRetryWithoutDiscardingDiagnostics() {
     DeliveryJob job =
-        DeliveryJob.pending(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 3, NOW);
+        DeliveryJob.pending(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            TARGET_URL,
+            ENCRYPTED_SECRET,
+            3,
+            NOW);
     job.claim("worker-a", NOW);
     job.scheduleRetry(1, 503, "temporary failure", NOW.plusSeconds(30), NOW);
 
@@ -70,11 +100,38 @@ class DeliveryJobTest {
   @Test
   void refusesToCancelAJobThatIsBeingProcessed() {
     DeliveryJob job =
-        DeliveryJob.pending(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 3, NOW);
+        DeliveryJob.pending(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            TARGET_URL,
+            ENCRYPTED_SECRET,
+            3,
+            NOW);
     job.claim("worker-a", NOW);
 
     assertThatThrownBy(() -> job.cancel(NOW.plusSeconds(1)))
         .isInstanceOf(dev.ncc.webhook.common.DeliveryStateConflictException.class)
         .hasMessageContaining("PROCESSING");
+  }
+
+  @Test
+  void retainsAcceptedEndpointConfigurationAcrossReplay() {
+    DeliveryJob job =
+        DeliveryJob.pending(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            TARGET_URL,
+            ENCRYPTED_SECRET,
+            3,
+            NOW);
+    job.claim("worker-a", NOW);
+    job.failPermanently(1, 400, "invalid target response", NOW);
+
+    job.replay(NOW.plusSeconds(1), 3);
+
+    assertThat(job.getTargetUrl()).isEqualTo(TARGET_URL);
+    assertThat(job.getEncryptedSecret()).isEqualTo(ENCRYPTED_SECRET);
   }
 }

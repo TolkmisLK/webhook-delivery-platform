@@ -11,6 +11,7 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 - Race-safe, idempotent cancellation for queued delivery jobs with a stable conflict response.
 - Bilingual cancellation controls and bounded Prometheus coverage for the `CANCELED` state.
 - Commit-consistent delivery SSE notifications and after-commit operator action logs.
+- Immutable target URL and encrypted signing-secret snapshots for every accepted delivery.
 
 ## [0.3.0] - 2026-08-25
 
