@@ -31,6 +31,7 @@ The first release intentionally uses a modular monolith and a PostgreSQL-backed 
 - Prometheus queue-health gauges with bounded status tags and runnable-job age
 - Race-safe, idempotent cancellation for queued delivery jobs
 - Commit-consistent SSE state notifications and after-commit operator action logs
+- Immutable per-delivery target URL and encrypted-secret snapshots across retries and replay
 
 ### Quick start
 
@@ -106,7 +107,7 @@ The backend gate also checks Google Java Format and verifies the Spring Modulith
 
 ### Current scope
 
-`v0.4` starts with race-safe cancellation for queued delivery jobs. A successful cancel serializes with worker claims, remains visible in the audit view, and can be reversed through replay. URL editing and secret rotation remain deferred until pending-job configuration snapshot semantics are defined.
+`v0.4` adds race-safe cancellation, commit-consistent state updates, and immutable target-configuration snapshots for accepted deliveries. Retries and replay keep the original normalized URL and encrypted signing secret, so future Endpoint edits cannot redirect already accepted work. URL editing and secret rotation remain separate follow-up slices.
 
 ## 中文
 
@@ -134,6 +135,7 @@ Webhook Delivery Platform 是一个生产风格的全栈可靠事件投递参考
 - 使用固定状态标签与可运行任务年龄的 Prometheus 队列健康指标
 - 支持并发安全和幂等操作的排队任务取消能力
 - 只反映已提交状态的 SSE 通知，以及提交后的人工操作日志
+- 在重试与重投期间保持不变的任务级目标 URL 与加密密钥快照
 
 ### 快速开始
 
@@ -212,7 +214,7 @@ PostgreSQL 集成测试会启动真实目标服务，通过 API 验证幂等接�
 
 ### 当前范围
 
-`v0.4` 首先增加排队任务的并发安全取消能力。取消成功会与 Worker 抢占互斥，任务仍保留在审查视图中，并可通过重新投递恢复。Endpoint URL 编辑与密钥轮换继续暂缓，直至待处理任务的配置快照语义明确。
+`v0.4` 增加排队任务的并发安全取消、提交一致的状态更新，以及已接收任务的不可变目标配置快照。重试与重投始终沿用接收时的规范化 URL 和加密签名密钥，因此未来的 Endpoint 修改不会重定向已经接收的任务。URL 编辑与密钥轮换仍作为后续独立切片推进。
 
 ## License
 

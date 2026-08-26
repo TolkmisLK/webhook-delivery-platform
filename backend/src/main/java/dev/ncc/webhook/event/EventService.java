@@ -56,7 +56,11 @@ public class EventService {
     if (existing.isPresent()) {
       AcceptedDelivery delivery =
           deliverySubmission.ensureScheduled(
-              existing.get().getId(), endpoint.getId(), existing.get().getCreatedAt());
+              existing.get().getId(),
+              endpoint.getId(),
+              endpoint.getUrl(),
+              endpoint.getEncryptedSecret(),
+              existing.get().getCreatedAt());
       return response(existing.get(), delivery, true);
     }
 
@@ -73,7 +77,12 @@ public class EventService {
     eventRepository.save(event);
 
     AcceptedDelivery delivery =
-        deliverySubmission.ensureScheduled(event.getId(), endpoint.getId(), now);
+        deliverySubmission.ensureScheduled(
+            event.getId(),
+            endpoint.getId(),
+            endpoint.getUrl(),
+            endpoint.getEncryptedSecret(),
+            now);
     return response(event, delivery, false);
   }
 

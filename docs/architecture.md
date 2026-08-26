@@ -33,7 +33,7 @@ The `event` module calls the `DeliverySubmission` port that it owns; the `delive
 
 1. Lock the target endpoint row to serialize submissions for one endpoint.
 2. Return the existing event and job when the idempotency key already exists.
-3. Persist the immutable event body and `PENDING` delivery job in one transaction.
+3. Persist the immutable event body, normalized target URL, encrypted signing secret, and `PENDING` delivery job in one transaction.
 4. Return HTTP `202 Accepted` only after the transaction succeeds.
 
 The unique `(endpoint_id, idempotency_key)` constraint is the final database guard.
@@ -88,6 +88,7 @@ The demo receiver exposes `/hooks/flaky?failures=N` for a bounded, deterministic
 
 - Event body is rendered once and reused byte-for-byte across attempts.
 - Endpoint secrets are encrypted before persistence and decrypted only for delivery.
+- Each delivery job snapshots the normalized URL and encrypted secret at acceptance. Retries and replay use that immutable snapshot rather than live Endpoint configuration, while URL safety is re-evaluated before every outbound request.
 - Endpoint activation changes require the version last observed by the operator; stale writes return HTTP `409`.
 - Deactivation blocks new event acceptance while already accepted delivery jobs continue under the existing immutable-event contract.
 - Cancellation locks the delivery row before checking state. This serializes with worker `SKIP LOCKED` claims: only `PENDING` and `RETRY_SCHEDULED` can become `CANCELED`, and repeated cancellation is idempotent.
@@ -117,7 +118,7 @@ The demo receiver exposes `/hooks/flaky?failures=N` for a bounded, deterministic
 
 1. 锁定目标 Endpoint 行，对同一 Endpoint 的事件提交进行串行化。
 2. 幂等键已存在时返回原事件与投递任务。
-3. 在同一个事务中保存不可变事件体和 `PENDING` 任务。
+3. 在同一个事务中保存不可变事件体、规范化目标 URL、加密签名密钥和 `PENDING` 任务。
 4. 事务成功后返回 HTTP `202 Accepted`。
 
 数据库唯一约束 `(endpoint_id, idempotency_key)` 是最终一致性保护。
@@ -156,6 +157,7 @@ Worker 使用 `FOR UPDATE SKIP LOCKED` 抢占到期任务。事务只负责将�
 
 ### Endpoint 生命周期一致性
 
+- 每个投递任务在接收时固化规范化 URL 与加密密钥；重试和重投读取不可变任务快照而不是 Endpoint 实时配置，同时每次出站请求前仍会重新执行 URL 安全校验。
 - Endpoint 启停变更必须携带运维端最后观察到的版本；陈旧写入返回 HTTP `409`。
 - 停用会阻止接收新事件，已经接收的投递任务仍按现有不可变事件契约继续执行。
 - 取消操作会先锁定任务行再检查状态，并与 Worker 的 `SKIP LOCKED` 抢占互斥；只有 `PENDING` 与 `RETRY_SCHEDULED` 可进入 `CANCELED`，重复取消保持幂等。

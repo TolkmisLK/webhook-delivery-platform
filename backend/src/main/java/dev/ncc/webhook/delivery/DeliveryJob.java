@@ -23,6 +23,12 @@ public class DeliveryJob {
   @Column(name = "endpoint_id", nullable = false)
   private UUID endpointId;
 
+  @Column(name = "target_url", nullable = false, length = 2048)
+  private String targetUrl;
+
+  @Column(name = "encrypted_secret", nullable = false, length = 1024)
+  private String encryptedSecret;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 32)
   private DeliveryStatus status;
@@ -59,10 +65,19 @@ public class DeliveryJob {
   protected DeliveryJob() {}
 
   private DeliveryJob(
-      UUID id, UUID eventId, UUID endpointId, DeliveryStatus status, int maxAttempts, Instant now) {
+      UUID id,
+      UUID eventId,
+      UUID endpointId,
+      String targetUrl,
+      String encryptedSecret,
+      DeliveryStatus status,
+      int maxAttempts,
+      Instant now) {
     this.id = id;
     this.eventId = eventId;
     this.endpointId = endpointId;
+    this.targetUrl = targetUrl;
+    this.encryptedSecret = encryptedSecret;
     this.status = status;
     this.maxAttempts = maxAttempts;
     this.nextAttemptAt = now;
@@ -71,8 +86,22 @@ public class DeliveryJob {
   }
 
   public static DeliveryJob pending(
-      UUID id, UUID eventId, UUID endpointId, int maxAttempts, Instant now) {
-    return new DeliveryJob(id, eventId, endpointId, DeliveryStatus.PENDING, maxAttempts, now);
+      UUID id,
+      UUID eventId,
+      UUID endpointId,
+      String targetUrl,
+      String encryptedSecret,
+      int maxAttempts,
+      Instant now) {
+    return new DeliveryJob(
+        id,
+        eventId,
+        endpointId,
+        targetUrl,
+        encryptedSecret,
+        DeliveryStatus.PENDING,
+        maxAttempts,
+        now);
   }
 
   public void claim(String workerId, Instant now) {
@@ -160,6 +189,14 @@ public class DeliveryJob {
 
   public UUID getEndpointId() {
     return endpointId;
+  }
+
+  public String getTargetUrl() {
+    return targetUrl;
+  }
+
+  public String getEncryptedSecret() {
+    return encryptedSecret;
   }
 
   public DeliveryStatus getStatus() {

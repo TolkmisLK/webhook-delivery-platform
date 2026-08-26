@@ -28,6 +28,8 @@ class DeliveryStateEventsTest {
 
   private static final Instant NOW = Instant.parse("2026-08-26T02:00:00Z");
   private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
+  private static final String TARGET_URL = "https://example.com/hooks";
+  private static final String ENCRYPTED_SECRET = "encrypted-secret";
 
   @Test
   void publishesOneManualCancelEventWhenCancellationIsRepeated() {
@@ -36,7 +38,7 @@ class DeliveryStateEventsTest {
     WebhookEventRepository webhookEvents = mock(WebhookEventRepository.class);
     WebhookEndpointRepository endpoints = mock(WebhookEndpointRepository.class);
     DeliveryJob job =
-        DeliveryJob.pending(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 3, NOW);
+        pendingJob();
     WebhookEvent event = mock(WebhookEvent.class);
     WebhookEndpoint endpoint = mock(WebhookEndpoint.class);
     when(jobs.findByIdForUpdate(job.getId())).thenReturn(Optional.of(job));
@@ -66,9 +68,9 @@ class DeliveryStateEventsTest {
   void distinguishesWorkerClaimsFromStaleLeaseRecovery() {
     DeliveryJobRepository jobs = mock(DeliveryJobRepository.class);
     DeliveryJob pending =
-        DeliveryJob.pending(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 3, NOW);
+        pendingJob();
     DeliveryJob stale =
-        DeliveryJob.pending(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 3, NOW);
+        pendingJob();
     stale.claim("stale-worker", NOW.minusSeconds(60));
     when(jobs.findClaimable(any(), any(), anyInt())).thenReturn(List.of(pending, stale));
 
@@ -106,5 +108,16 @@ class DeliveryStateEventsTest {
     assertThat(listener).isNotNull();
     assertThat(listener.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
     assertThat(listener.fallbackExecution()).isFalse();
+  }
+
+  private DeliveryJob pendingJob() {
+    return DeliveryJob.pending(
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        TARGET_URL,
+        ENCRYPTED_SECRET,
+        3,
+        NOW);
   }
 }

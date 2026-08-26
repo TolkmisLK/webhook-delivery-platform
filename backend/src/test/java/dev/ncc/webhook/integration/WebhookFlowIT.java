@@ -49,6 +49,8 @@ class WebhookFlowIT {
   private static final AtomicInteger RECEIVED_COUNT = new AtomicInteger();
   private static final AtomicInteger FLAKY_COUNT = new AtomicInteger();
   private static final AtomicInteger CANCELED_TARGET_COUNT = new AtomicInteger();
+  private static final AtomicInteger SNAPSHOT_ORIGINAL_COUNT = new AtomicInteger();
+  private static final AtomicInteger SNAPSHOT_MUTATED_COUNT = new AtomicInteger();
   private static final HttpServer TARGET = startTarget();
 
   @Container
@@ -125,6 +127,17 @@ class WebhookFlowIT {
             .getResponse()
             .getContentAsString();
     UUID deliveryId = UUID.fromString(jsonMapper.readTree(eventJson).get("deliveryId").asText());
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select target_url from delivery_job where id = ?", String.class, deliveryId))
+        .isEqualTo("http://127.0.0.1:%d/hooks".formatted(TARGET.getAddress().getPort()));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select encrypted_secret from delivery_job where id = ?",
+                String.class,
+                deliveryId))
+        .isNotBlank()
+        .doesNotContain("integration-secret");
 
     String duplicateJson =
         mockMvc
@@ -228,6 +241,46 @@ class WebhookFlowIT {
     assertThat(attempts.get(1).get("outcome").asText()).isEqualTo("RETRY_SCHEDULED");
     assertThat(attempts.get(2).get("outcome").asText()).isEqualTo("SUCCEEDED");
     assertThat(FLAKY_COUNT.get()).isEqualTo(3);
+  }
+
+  @Test
+  void keepsAcceptedTargetSnapshotWhenTheEndpointRowChanges() throws Exception {
+    SNAPSHOT_ORIGINAL_COUNT.set(0);
+    SNAPSHOT_MUTATED_COUNT.set(0);
+    String endpointJson =
+        mockMvc
+            .perform(
+                post("/api/endpoints")
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "name": "snapshot target",
+                          "url": "http://127.0.0.1:%d/hooks/snapshot-original",
+                          "secret": "integration-secret"
+                        }
+                        """
+                            .formatted(TARGET.getAddress().getPort())))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    UUID endpointId = UUID.fromString(jsonMapper.readTree(endpointJson).get("id").asText());
+    UUID deliveryId = insertDelivery(endpointId, "PENDING", Instant.now().plusSeconds(60));
+
+    jdbcTemplate.update(
+        "update webhook_endpoint set url = ? where id = ?",
+        "http://127.0.0.1:%d/hooks/snapshot-mutated".formatted(TARGET.getAddress().getPort()),
+        endpointId);
+    jdbcTemplate.update(
+        "update delivery_job set next_attempt_at = ? where id = ?",
+        Timestamp.from(Instant.now().minusSeconds(1)),
+        deliveryId);
+
+    awaitSuccess(deliveryId);
+
+    assertThat(SNAPSHOT_ORIGINAL_COUNT.get()).isEqualTo(1);
+    assertThat(SNAPSHOT_MUTATED_COUNT.get()).isZero();
   }
 
   @Test
@@ -425,6 +478,12 @@ class WebhookFlowIT {
     UUID eventId = UUID.randomUUID();
     UUID deliveryId = UUID.randomUUID();
     Instant now = Instant.now();
+    String targetUrl =
+        jdbcTemplate.queryForObject(
+            "select url from webhook_endpoint where id = ?", String.class, endpointId);
+    String encryptedSecret =
+        jdbcTemplate.queryForObject(
+            "select encrypted_secret from webhook_endpoint where id = ?", String.class, endpointId);
     jdbcTemplate.update(
         """
         insert into webhook_event
@@ -440,13 +499,15 @@ class WebhookFlowIT {
     jdbcTemplate.update(
         """
         insert into delivery_job
-            (id, event_id, endpoint_id, status, attempt_count, max_attempts,
-             next_attempt_at, created_at, updated_at, version)
-        values (?, ?, ?, ?, 0, 3, ?, ?, ?, 0)
+            (id, event_id, endpoint_id, target_url, encrypted_secret, status,
+             attempt_count, max_attempts, next_attempt_at, created_at, updated_at, version)
+        values (?, ?, ?, ?, ?, ?, 0, 3, ?, ?, ?, 0)
         """,
         deliveryId,
         eventId,
         endpointId,
+        targetUrl,
+        encryptedSecret,
         status,
         Timestamp.from(nextAttemptAt),
         Timestamp.from(now),
@@ -460,6 +521,12 @@ class WebhookFlowIT {
       server.createContext("/hooks", exchange -> handleTarget(exchange, false, false));
       server.createContext("/hooks/flaky", exchange -> handleTarget(exchange, true, false));
       server.createContext("/hooks/cancel", exchange -> handleTarget(exchange, false, true));
+      server.createContext(
+          "/hooks/snapshot-original",
+          exchange -> handleSnapshotTarget(exchange, SNAPSHOT_ORIGINAL_COUNT));
+      server.createContext(
+          "/hooks/snapshot-mutated",
+          exchange -> handleSnapshotTarget(exchange, SNAPSHOT_MUTATED_COUNT));
       server.start();
       return server;
     } catch (IOException exception) {
@@ -495,6 +562,20 @@ class WebhookFlowIT {
     if (response != null) {
       exchange.getResponseBody().write(response);
     }
+    exchange.close();
+  }
+
+  private static void handleSnapshotTarget(HttpExchange exchange, AtomicInteger counter)
+      throws IOException {
+    String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+    String timestamp = exchange.getRequestHeaders().getFirst("X-Webhook-Timestamp");
+    String supplied = exchange.getRequestHeaders().getFirst("X-Webhook-Signature");
+    String expected = new HmacSigner().sign("integration-secret", Long.parseLong(timestamp), body);
+    int statusCode = expected.equals(supplied) ? 204 : 401;
+    if (statusCode == 204) {
+      counter.incrementAndGet();
+    }
+    exchange.sendResponseHeaders(statusCode, -1);
     exchange.close();
   }
 }

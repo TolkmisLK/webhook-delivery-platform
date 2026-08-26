@@ -26,7 +26,12 @@ class DeliverySubmissionService implements DeliverySubmission {
 
   @Override
   @Transactional
-  public AcceptedDelivery ensureScheduled(UUID eventId, UUID endpointId, Instant acceptedAt) {
+  public AcceptedDelivery ensureScheduled(
+      UUID eventId,
+      UUID endpointId,
+      String targetUrl,
+      String encryptedSecret,
+      Instant acceptedAt) {
     return repository
         .findByEventId(eventId)
         .map(this::accepted)
@@ -37,6 +42,8 @@ class DeliverySubmissionService implements DeliverySubmission {
                       UUID.randomUUID(),
                       eventId,
                       endpointId,
+                      targetUrl,
+                      encryptedSecret,
                       properties.getMaxAttempts(),
                       acceptedAt);
               repository.save(job);
