@@ -599,6 +599,34 @@ td code {
   white-space: nowrap;
 }
 
+.endpoint-edit-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(280px, 1.3fr);
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--accent-soft);
+  border-radius: 12px;
+}
+
+.endpoint-edit-form label {
+  margin: 0;
+}
+
+.endpoint-edit-form p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.configuration-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 10px;
+}
+
 .secret-rotation-form {
   display: grid;
   grid-template-columns: minmax(240px, 1fr) minmax(220px, 1fr) auto;
@@ -680,6 +708,15 @@ footer {
   .secret-rotation-form {
     grid-template-columns: 1fr;
     align-items: stretch;
+  }
+
+  .endpoint-edit-form {
+    grid-template-columns: 1fr;
+  }
+
+  .endpoint-edit-form p,
+  .configuration-actions {
+    grid-column: auto;
   }
 }
 

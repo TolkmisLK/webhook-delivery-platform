@@ -77,4 +77,9 @@ public class WebhookEndpoint {
   void rotateSecret(String encryptedSecret) {
     this.encryptedSecret = encryptedSecret;
   }
+
+  void updateConfiguration(String name, String url) {
+    this.name = name;
+    this.url = url;
+  }
 }

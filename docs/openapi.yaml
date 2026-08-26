@@ -43,6 +43,34 @@ paths:
                 $ref: "#/components/schemas/Endpoint"
         "400":
           $ref: "#/components/responses/BadRequest"
+  /api/endpoints/{endpointId}:
+    put:
+      operationId: updateEndpoint
+      summary: Update an endpoint name and target URL / 更新 Endpoint 名称与目标 URL
+      description: |
+        Replaces the live Endpoint name and normalized target URL.
+        Deliveries accepted before this update retain their immutable target snapshot.
+      parameters:
+        - $ref: "#/components/parameters/EndpointId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEndpoint"
+      responses:
+        "200":
+          description: Endpoint updated or already equal after normalization.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Endpoint"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/VersionConflict"
   /api/endpoints/{endpointId}/status:
     patch:
       operationId: setEndpointStatus
@@ -257,16 +285,32 @@ components:
       properties:
         name:
           type: string
+          minLength: 1
           maxLength: 120
         url:
           type: string
           format: uri
+          minLength: 1
           maxLength: 2048
         secret:
           type: string
           minLength: 16
           maxLength: 512
           writeOnly: true
+    UpdateEndpoint:
+      type: object
+      required: [name, url, expectedVersion]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        url:
+          type: string
+          format: uri
+          minLength: 1
+          maxLength: 2048
+        expectedVersion: { type: integer, minimum: 0 }
     SetEndpointStatus:
       type: object
       required: [active, expectedVersion]

@@ -8,6 +8,7 @@ import dev.ncc.webhook.endpoint.EndpointDtos.CreateEndpointRequest;
 import dev.ncc.webhook.endpoint.EndpointDtos.EndpointResponse;
 import dev.ncc.webhook.endpoint.EndpointDtos.RotateEndpointSecretRequest;
 import dev.ncc.webhook.endpoint.EndpointDtos.SetEndpointStatusRequest;
+import dev.ncc.webhook.endpoint.EndpointDtos.UpdateEndpointRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -80,6 +81,25 @@ public class EndpointService {
     WebhookEndpoint saved = repository.saveAndFlush(endpoint);
     events.publishEvent(
         new EndpointSecretRotated(saved.getId(), saved.getVersion(), Instant.now(clock)));
+    return EndpointResponse.from(saved);
+  }
+
+  @Transactional
+  public EndpointResponse update(UUID endpointId, UpdateEndpointRequest request) {
+    WebhookEndpoint endpoint = findVersioned(endpointId, request.expectedVersion());
+    String normalizedName = request.name().trim();
+    String normalizedUrl = urlSafetyPolicy.validate(request.url()).toASCIIString();
+    boolean nameChanged = !endpoint.getName().equals(normalizedName);
+    boolean urlChanged = !endpoint.getUrl().equals(normalizedUrl);
+    if (!nameChanged && !urlChanged) {
+      return EndpointResponse.from(endpoint);
+    }
+
+    endpoint.updateConfiguration(normalizedName, normalizedUrl);
+    WebhookEndpoint saved = repository.saveAndFlush(endpoint);
+    events.publishEvent(
+        new EndpointConfigurationChanged(
+            saved.getId(), saved.getVersion(), nameChanged, urlChanged, Instant.now(clock)));
     return EndpointResponse.from(saved);
   }
 

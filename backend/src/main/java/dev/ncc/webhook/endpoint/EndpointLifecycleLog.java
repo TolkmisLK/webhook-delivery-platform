@@ -28,4 +28,16 @@ class EndpointLifecycleLog {
         event.version(),
         event.rotatedAt());
   }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  void record(EndpointConfigurationChanged event) {
+    logger.info(
+        "endpoint_configuration_changed endpointId={} version={} nameChanged={} urlChanged={}"
+            + " changedAt={}",
+        event.endpointId(),
+        event.version(),
+        event.nameChanged(),
+        event.urlChanged(),
+        event.changedAt());
+  }
 }

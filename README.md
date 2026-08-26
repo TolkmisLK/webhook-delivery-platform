@@ -33,6 +33,7 @@ The first release intentionally uses a modular monolith and a PostgreSQL-backed 
 - Commit-consistent SSE state notifications and after-commit operator action logs
 - Immutable per-delivery target URL and encrypted-secret snapshots across retries and replay
 - Versioned Endpoint signing-secret rotation without exposing secret material
+- Versioned Endpoint name and target-URL editing with full safety revalidation
 
 ### Quick start
 
@@ -108,7 +109,7 @@ The backend gate also checks Google Java Format and verifies the Spring Modulith
 
 ### Current scope
 
-`v0.4` adds race-safe cancellation, commit-consistent state updates, immutable target-configuration snapshots, and versioned signing-secret rotation. Deliveries accepted before rotation keep the old encrypted-secret snapshot; newly accepted work uses the replacement secret. Receivers should temporarily accept both generations until older deliveries reach terminal states. URL editing remains a separate follow-up slice.
+`v0.4` adds race-safe cancellation, commit-consistent state updates, immutable target-configuration snapshots, and versioned Endpoint configuration controls. Name and target-URL edits re-run the complete URL safety policy; accepted deliveries keep their original target snapshot while newly accepted work uses the updated normalized URL. Secret rotation follows the same version contract, and receivers should temporarily accept both secret generations until older deliveries reach terminal states.
 
 ## 中文
 
@@ -138,6 +139,7 @@ Webhook Delivery Platform 是一个生产风格的全栈可靠事件投递参考
 - 只反映已提交状态的 SSE 通知，以及提交后的人工操作日志
 - 在重试与重投期间保持不变的任务级目标 URL 与加密密钥快照
 - 不暴露密钥内容且带版本校验的 Endpoint 签名密钥轮换
+- 重新执行完整安全校验且带版本控制的 Endpoint 名称与目标地址编辑
 
 ### 快速开始
 
@@ -216,7 +218,7 @@ PostgreSQL 集成测试会启动真实目标服务，通过 API 验证幂等接�
 
 ### 当前范围
 
-`v0.4` 增加排队任务的并发安全取消、提交一致的状态更新、已接收任务的不可变目标配置快照，以及带版本校验的签名密钥轮换。轮换前接收的任务保留旧密钥快照，轮换后接收的任务使用新密钥；旧任务进入终态前，接收端应暂时同时接受两代密钥。URL 编辑仍作为独立后续切片推进。
+`v0.4` 增加排队任务的并发安全取消、提交一致的状态更新、已接收任务的不可变目标配置快照，以及带版本校验的 Endpoint 配置控制。名称与目标地址编辑会重新执行完整 URL 安全策略；已接收任务保留原目标快照，新接收任务使用更新后的规范化 URL。密钥轮换沿用相同版本契约，旧任务进入终态前，接收端应暂时同时接受两代密钥。
 
 ## License
 

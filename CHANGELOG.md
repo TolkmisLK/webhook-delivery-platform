@@ -14,6 +14,8 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 - Immutable target URL and encrypted signing-secret snapshots for every accepted delivery.
 - Versioned Endpoint signing-secret rotation with metadata-only after-commit audit logs.
 - Bilingual secret-rotation controls and old/new delivery-signature integration coverage.
+- Versioned Endpoint name and target-URL editing with complete URL-safety revalidation.
+- Bilingual configuration controls and old/new delivery-target integration coverage.
 
 ## [0.3.0] - 2026-08-25
 

@@ -73,3 +73,32 @@ describe("endpoint secret rotation", () => {
     expect(rotated).not.toHaveProperty("secret");
   });
 });
+
+describe("endpoint configuration editing", () => {
+  it("sends the complete configuration with the observed version", async () => {
+    const updated = {
+      ...endpoints[0],
+      name: "Updated receiver",
+      url: "https://example.com/updated",
+      version: 3,
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => updated,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      api.updateEndpoint("active-1", "Updated receiver", "https://example.com/updated", 2),
+    ).resolves.toEqual(updated);
+    expect(fetchMock).toHaveBeenCalledWith("/api/endpoints/active-1", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Updated receiver",
+        url: "https://example.com/updated",
+        expectedVersion: 2,
+      }),
+    });
+  });
+});

@@ -22,6 +22,7 @@
 | SSRF to local infrastructure | HTTP(S)-only URLs, DNS resolution checks, private-address policy, and port allowlist |
 | Redirect-based policy bypass | Redirect following is disabled |
 | DNS changes after registration | URL policy is evaluated again immediately before delivery |
+| Unsafe Endpoint reconfiguration | Every target-URL edit re-runs the complete registration-time URL policy before persistence |
 | Resource exhaustion | Request timeout, response-size bound, payload limit at the reverse proxy, bounded outbound concurrency and retry count |
 | Forged delivery | HMAC-SHA256 over timestamp and exact body |
 | Timing attack in receiver | Included receiver uses constant-time signature comparison |
@@ -35,6 +36,8 @@
 ### Endpoint secret rotation
 
 Endpoint signing-secret rotation requires the version last observed by the operator. A stale request returns HTTP `409`; successful rotation increments the Endpoint version and never returns or logs either secret. Accepted delivery jobs keep their encrypted-secret snapshots, so receivers must accept both old and new secrets until pre-rotation deliveries reach terminal states.
+
+Endpoint target-URL edits require the same observed version and re-run the complete URL safety policy before persistence. Successful audit events contain only change flags, not the old or new URL. Accepted delivery jobs keep their original target snapshots, so an edit cannot redirect queued or retried work.
 
 ### Deployment boundary
 
@@ -76,6 +79,7 @@ Consumers should:
 | SSRF 访问内部基础设施 | 仅支持 HTTP(S)、DNS 地址检查、私有地址策略和端口白名单 |
 | 利用重定向绕过策略 | 禁止自动跟随重定向 |
 | 注册后 DNS 发生变化 | 每次投递前重新执行 URL 策略 |
+| 不安全的 Endpoint 配置修改 | 每次目标 URL 编辑都在持久化前重新执行与注册时相同的完整 URL 策略 |
 | 资源耗尽 | 请求超时、响应大小限制、反向代理 Payload 限制、出站并发上限和有限重试 |
 | 伪造投递 | 对时间戳与完整请求体执行 HMAC-SHA256 |
 | 接收方时序攻击 | Demo Receiver 使用常量时间比较 |
@@ -85,6 +89,8 @@ Consumers should:
 `APP_SECURITY_MASTER_KEY` 是 Base64 编码的 32 字节密钥。更换密钥时需要执行受控迁移，先用旧密钥解密，再用新密钥加密已有 Endpoint 数据。
 
 Endpoint 签名密钥轮换必须携带运维端最后观察到的版本。陈旧请求返回 HTTP `409`；轮换成功后 Endpoint 版本递增，API 与日志均不返回新旧密钥。已接收任务保留各自的加密密钥快照，因此轮换前任务进入终态前，接收端必须同时接受新旧密钥。
+
+Endpoint 目标 URL 编辑沿用相同的观察版本，并在持久化前重新执行完整 URL 安全策略。成功后的审计事件只包含变更标记，不包含新旧 URL；已接收任务保留原目标快照，因此编辑操作无法重定向排队或重试中的任务。
 
 当前版本是单操作者工程控制台。部署时应放在带认证的反向代理或私有网络边界之后；在支持多人共享部署前，将增加系统自身的账号与授权策略。
 
