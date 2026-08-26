@@ -6,6 +6,7 @@ import dev.ncc.webhook.config.SecretCipher;
 import dev.ncc.webhook.config.UrlSafetyPolicy;
 import dev.ncc.webhook.endpoint.EndpointDtos.CreateEndpointRequest;
 import dev.ncc.webhook.endpoint.EndpointDtos.EndpointResponse;
+import dev.ncc.webhook.endpoint.EndpointDtos.RotateEndpointSecretRequest;
 import dev.ncc.webhook.endpoint.EndpointDtos.SetEndpointStatusRequest;
 import java.time.Clock;
 import java.time.Instant;
@@ -60,14 +61,7 @@ public class EndpointService {
 
   @Transactional
   public EndpointResponse setStatus(UUID endpointId, SetEndpointStatusRequest request) {
-    WebhookEndpoint endpoint =
-        repository
-            .findById(endpointId)
-            .orElseThrow(() -> new NotFoundException("Webhook endpoint was not found"));
-    if (endpoint.getVersion() != request.expectedVersion()) {
-      throw new VersionConflictException(
-          "Webhook endpoint changed; refresh it before retrying the update");
-    }
+    WebhookEndpoint endpoint = findVersioned(endpointId, request.expectedVersion());
     if (endpoint.isActive() == request.active()) {
       return EndpointResponse.from(endpoint);
     }
@@ -77,5 +71,27 @@ public class EndpointService {
     events.publishEvent(
         new EndpointStatusChanged(saved.getId(), saved.isActive(), saved.getVersion()));
     return EndpointResponse.from(saved);
+  }
+
+  @Transactional
+  public EndpointResponse rotateSecret(UUID endpointId, RotateEndpointSecretRequest request) {
+    WebhookEndpoint endpoint = findVersioned(endpointId, request.expectedVersion());
+    endpoint.rotateSecret(secretCipher.encrypt(request.newSecret()));
+    WebhookEndpoint saved = repository.saveAndFlush(endpoint);
+    events.publishEvent(
+        new EndpointSecretRotated(saved.getId(), saved.getVersion(), Instant.now(clock)));
+    return EndpointResponse.from(saved);
+  }
+
+  private WebhookEndpoint findVersioned(UUID endpointId, long expectedVersion) {
+    WebhookEndpoint endpoint =
+        repository
+            .findById(endpointId)
+            .orElseThrow(() -> new NotFoundException("Webhook endpoint was not found"));
+    if (endpoint.getVersion() != expectedVersion) {
+      throw new VersionConflictException(
+          "Webhook endpoint changed; refresh it before retrying the update");
+    }
+    return endpoint;
   }
 }

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { api } from "../src/lib/api";
 import type { Endpoint } from "../src/lib/types";
 import { selectActiveEndpoint } from "../src/lib/view";
 
@@ -29,6 +30,10 @@ const endpoints: Endpoint[] = [
   },
 ];
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("selectActiveEndpoint", () => {
   it("keeps the current selection when it is active", () => {
     expect(selectActiveEndpoint(endpoints, "active-2")).toBe("active-2");
@@ -45,5 +50,26 @@ describe("selectActiveEndpoint", () => {
         "active-1",
       ),
     ).toBe("");
+  });
+});
+
+describe("endpoint secret rotation", () => {
+  it("sends the new secret only in the write request", async () => {
+    const rotated = { ...endpoints[0], version: 3 };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => rotated,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(api.rotateEndpointSecret("active-1", "replacement-secret", 2)).resolves.toEqual(
+      rotated,
+    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/endpoints/active-1/secret", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newSecret: "replacement-secret", expectedVersion: 2 }),
+    });
+    expect(rotated).not.toHaveProperty("secret");
   });
 });

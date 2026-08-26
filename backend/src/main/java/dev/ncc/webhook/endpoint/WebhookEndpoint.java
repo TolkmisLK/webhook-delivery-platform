@@ -73,4 +73,8 @@ public class WebhookEndpoint {
   void setActive(boolean active) {
     this.active = active;
   }
+
+  void rotateSecret(String encryptedSecret) {
+    this.encryptedSecret = encryptedSecret;
+  }
 }

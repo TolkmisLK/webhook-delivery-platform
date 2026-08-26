@@ -12,6 +12,8 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 - Bilingual cancellation controls and bounded Prometheus coverage for the `CANCELED` state.
 - Commit-consistent delivery SSE notifications and after-commit operator action logs.
 - Immutable target URL and encrypted signing-secret snapshots for every accepted delivery.
+- Versioned Endpoint signing-secret rotation with metadata-only after-commit audit logs.
+- Bilingual secret-rotation controls and old/new delivery-signature integration coverage.
 
 ## [0.3.0] - 2026-08-25
 

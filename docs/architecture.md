@@ -90,6 +90,8 @@ The demo receiver exposes `/hooks/flaky?failures=N` for a bounded, deterministic
 - Endpoint secrets are encrypted before persistence and decrypted only for delivery.
 - Each delivery job snapshots the normalized URL and encrypted secret at acceptance. Retries and replay use that immutable snapshot rather than live Endpoint configuration, while URL safety is re-evaluated before every outbound request.
 - Endpoint activation changes require the version last observed by the operator; stale writes return HTTP `409`.
+- Secret rotation follows the same optimistic-version contract. It replaces only the live Endpoint ciphertext, so pre-rotation jobs keep signing with their accepted snapshot while newly accepted jobs capture the replacement secret.
+- Secret-rotation audit events are consumed after commit and contain only Endpoint ID, resulting version, and rotation time.
 - Deactivation blocks new event acceptance while already accepted delivery jobs continue under the existing immutable-event contract.
 - Cancellation locks the delivery row before checking state. This serializes with worker `SKIP LOCKED` claims: only `PENDING` and `RETRY_SCHEDULED` can become `CANCELED`, and repeated cancellation is idempotent.
 - A manual replay extends the attempt budget without resetting the historical attempt sequence.
@@ -159,6 +161,8 @@ Worker 使用 `FOR UPDATE SKIP LOCKED` 抢占到期任务。事务只负责将�
 
 - 每个投递任务在接收时固化规范化 URL 与加密密钥；重试和重投读取不可变任务快照而不是 Endpoint 实时配置，同时每次出站请求前仍会重新执行 URL 安全校验。
 - Endpoint 启停变更必须携带运维端最后观察到的版本；陈旧写入返回 HTTP `409`。
+- 密钥轮换沿用相同的乐观版本契约，只替换 Endpoint 实时密文；轮换前任务继续使用接收时快照签名，轮换后新任务固化新密钥。
+- 密钥轮换审计事件仅在事务提交后消费，内容只包含 Endpoint ID、更新后版本和轮换时间。
 - 停用会阻止接收新事件，已经接收的投递任务仍按现有不可变事件契约继续执行。
 - 取消操作会先锁定任务行再检查状态，并与 Worker 的 `SKIP LOCKED` 抢占互斥；只有 `PENDING` 与 `RETRY_SCHEDULED` 可进入 `CANCELED`，重复取消保持幂等。
 - 状态变更日志仅在事务提交后产生，回滚操作不会形成已完成的运行证据。

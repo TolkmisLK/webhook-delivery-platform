@@ -2,6 +2,7 @@ package dev.ncc.webhook.endpoint;
 
 import dev.ncc.webhook.endpoint.EndpointDtos.CreateEndpointRequest;
 import dev.ncc.webhook.endpoint.EndpointDtos.EndpointResponse;
+import dev.ncc.webhook.endpoint.EndpointDtos.RotateEndpointSecretRequest;
 import dev.ncc.webhook.endpoint.EndpointDtos.SetEndpointStatusRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -41,5 +42,11 @@ public class EndpointController {
   EndpointResponse setStatus(
       @PathVariable UUID endpointId, @Valid @RequestBody SetEndpointStatusRequest request) {
     return service.setStatus(endpointId, request);
+  }
+
+  @PatchMapping("/{endpointId}/secret")
+  EndpointResponse rotateSecret(
+      @PathVariable UUID endpointId, @Valid @RequestBody RotateEndpointSecretRequest request) {
+    return service.rotateSecret(endpointId, request);
   }
 }

@@ -19,4 +19,13 @@ class EndpointLifecycleLog {
         event.active(),
         event.version());
   }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  void record(EndpointSecretRotated event) {
+    logger.info(
+        "endpoint_secret_rotated endpointId={} version={} rotatedAt={}",
+        event.endpointId(),
+        event.version(),
+        event.rotatedAt());
+  }
 }

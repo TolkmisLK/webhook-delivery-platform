@@ -19,6 +19,10 @@ public final class EndpointDtos {
   public record SetEndpointStatusRequest(
       @NotNull Boolean active, @NotNull @PositiveOrZero Long expectedVersion) {}
 
+  public record RotateEndpointSecretRequest(
+      @NotBlank @Size(min = 16, max = 512) String newSecret,
+      @NotNull @PositiveOrZero Long expectedVersion) {}
+
   public record EndpointResponse(
       UUID id, String name, String url, boolean active, long version, Instant createdAt) {
 
