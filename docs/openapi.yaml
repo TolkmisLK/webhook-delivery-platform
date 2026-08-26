@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Webhook Delivery Platform API
-  version: 0.3.0
+  version: 0.4.0
   license:
     name: MIT
     identifier: MIT
@@ -153,6 +153,23 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+  /api/deliveries/{deliveryId}/cancel:
+    post:
+      operationId: cancelDelivery
+      summary: Cancel queued delivery work / 取消排队中的推送任务
+      parameters:
+        - $ref: "#/components/parameters/DeliveryId"
+      responses:
+        "200":
+          description: Delivery is CANCELED; repeating the request is idempotent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Delivery"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/DeliveryStateConflict"
   /api/deliveries/stream:
     get:
       operationId: streamDeliveryUpdates
@@ -195,6 +212,12 @@ components:
             $ref: "#/components/schemas/ApiError"
     VersionConflict:
       description: The endpoint version is stale and must be refreshed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    DeliveryStateConflict:
+      description: The delivery is no longer queued and cannot be canceled.
       content:
         application/json:
           schema:
@@ -317,7 +340,7 @@ components:
         finishedAt: { type: string, format: date-time }
     DeliveryStatus:
       type: string
-      enum: [PENDING, PROCESSING, RETRY_SCHEDULED, SUCCEEDED, DEAD]
+      enum: [PENDING, PROCESSING, RETRY_SCHEDULED, SUCCEEDED, DEAD, CANCELED]
     ApiError:
       type: object
       required: [timestamp, status, code, message, fields]

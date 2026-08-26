@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, parseEventData, statusTone } from "../src/lib/view";
+import { canCancelDelivery, formatDuration, parseEventData, statusTone } from "../src/lib/view";
 
 describe("delivery presentation", () => {
   it("maps terminal states to distinct tones", () => {
@@ -7,6 +7,16 @@ describe("delivery presentation", () => {
     expect(statusTone("DEAD")).toBe("danger");
     expect(statusTone("RETRY_SCHEDULED")).toBe("active");
     expect(statusTone("PENDING")).toBe("neutral");
+    expect(statusTone("CANCELED")).toBe("neutral");
+  });
+
+  it("allows cancellation only before outbound work starts", () => {
+    expect(canCancelDelivery("PENDING")).toBe(true);
+    expect(canCancelDelivery("RETRY_SCHEDULED")).toBe(true);
+    expect(canCancelDelivery("PROCESSING")).toBe(false);
+    expect(canCancelDelivery("SUCCEEDED")).toBe(false);
+    expect(canCancelDelivery("DEAD")).toBe(false);
+    expect(canCancelDelivery("CANCELED")).toBe(false);
   });
 
   it("accepts structured JSON event data", () => {

@@ -88,6 +88,18 @@ class DeliveryQueryService {
     return toResponse(job);
   }
 
+  @Transactional
+  DeliveryResponse cancel(UUID id) {
+    DeliveryJob job =
+        jobRepository
+            .findByIdForUpdate(id)
+            .orElseThrow(() -> new NotFoundException("Delivery job was not found"));
+    if (job.cancel(Instant.now(clock))) {
+      updates.publish(id, DeliveryStatus.CANCELED.name());
+    }
+    return toResponse(job);
+  }
+
   private DeliveryResponse toResponse(DeliveryJob job) {
     var event =
         eventRepository

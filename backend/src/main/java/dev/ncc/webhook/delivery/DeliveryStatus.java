@@ -5,5 +5,6 @@ public enum DeliveryStatus {
   PROCESSING,
   RETRY_SCHEDULED,
   SUCCEEDED,
-  DEAD
+  DEAD,
+  CANCELED
 }

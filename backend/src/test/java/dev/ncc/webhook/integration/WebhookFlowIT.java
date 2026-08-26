@@ -14,7 +14,9 @@ import dev.ncc.webhook.delivery.HmacSigner;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -42,6 +45,7 @@ class WebhookFlowIT {
   private static final AtomicReference<String> RECEIVED_SIGNATURE = new AtomicReference<>();
   private static final AtomicInteger RECEIVED_COUNT = new AtomicInteger();
   private static final AtomicInteger FLAKY_COUNT = new AtomicInteger();
+  private static final AtomicInteger CANCELED_TARGET_COUNT = new AtomicInteger();
   private static final HttpServer TARGET = startTarget();
 
   @Container
@@ -69,6 +73,7 @@ class WebhookFlowIT {
   @Autowired MockMvc mockMvc;
   @Autowired JsonMapper jsonMapper;
   @Autowired DeliveryJobRepository deliveryRepository;
+  @Autowired JdbcTemplate jdbcTemplate;
 
   @AfterAll
   static void stopTarget() {
@@ -325,15 +330,80 @@ class WebhookFlowIT {
     List<String> jobSeries =
         exposition.lines().filter(line -> line.startsWith("webhook_delivery_jobs{")).toList();
     assertThat(jobSeries)
-        .hasSize(5)
+        .hasSize(6)
         .allMatch(
             line ->
                 line.matches(
-                    "webhook_delivery_jobs\\{status=\\\"(pending|processing|retry_scheduled|succeeded|dead)\\\"}"
+                    "webhook_delivery_jobs\\{status=\\\"(pending|processing|retry_scheduled|succeeded|dead|canceled)\\\"}"
                         + " [0-9.Ee+-]+"));
     assertThat(exposition).contains("webhook_delivery_oldest_runnable_age_seconds");
     assertThat(String.join("\n", jobSeries))
         .doesNotContain("endpoint", "delivery_id", "event_type", "url", "idempotency");
+  }
+
+  @Test
+  void cancelsQueuedWorkIdempotentlyAndRejectsProcessingWork() throws Exception {
+    CANCELED_TARGET_COUNT.set(0);
+    String endpointJson =
+        mockMvc
+            .perform(
+                post("/api/endpoints")
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "name": "cancellation target",
+                          "url": "http://127.0.0.1:%d/hooks/cancel",
+                          "secret": "integration-secret"
+                        }
+                        """
+                            .formatted(TARGET.getAddress().getPort())))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    UUID endpointId = UUID.fromString(jsonMapper.readTree(endpointJson).get("id").asText());
+
+    UUID canceledDeliveryId = insertDelivery(endpointId, "PENDING", Instant.now().plusSeconds(60));
+    String canceledJson =
+        mockMvc
+            .perform(post("/api/deliveries/{id}/cancel", canceledDeliveryId))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(jsonMapper.readTree(canceledJson).get("status").asText()).isEqualTo("CANCELED");
+
+    mockMvc
+        .perform(post("/api/deliveries/{id}/cancel", canceledDeliveryId))
+        .andExpect(status().isOk());
+    jdbcTemplate.update(
+        "update delivery_job set next_attempt_at = ? where id = ?",
+        Timestamp.from(Instant.now().minusSeconds(1)),
+        canceledDeliveryId);
+    Thread.sleep(300);
+    assertThat(deliveryRepository.findById(canceledDeliveryId).orElseThrow().getStatus())
+        .isEqualTo(DeliveryStatus.CANCELED);
+    assertThat(CANCELED_TARGET_COUNT.get()).isZero();
+
+    UUID processingDeliveryId = insertDelivery(endpointId, "PROCESSING", Instant.now());
+    jdbcTemplate.update(
+        "update delivery_job set locked_at = ?, locked_by = 'integration-worker' where id = ?",
+        Timestamp.from(Instant.now()),
+        processingDeliveryId);
+    String conflictJson =
+        mockMvc
+            .perform(post("/api/deliveries/{id}/cancel", processingDeliveryId))
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(jsonMapper.readTree(conflictJson).get("code").asText())
+        .isEqualTo("delivery_state_conflict");
+
+    mockMvc
+        .perform(post("/api/deliveries/{id}/cancel", UUID.randomUUID()))
+        .andExpect(status().isNotFound());
   }
 
   private void awaitSuccess(UUID deliveryId) throws InterruptedException {
@@ -348,11 +418,45 @@ class WebhookFlowIT {
     throw new AssertionError("Delivery did not succeed before timeout");
   }
 
+  private UUID insertDelivery(UUID endpointId, String status, Instant nextAttemptAt) {
+    UUID eventId = UUID.randomUUID();
+    UUID deliveryId = UUID.randomUUID();
+    Instant now = Instant.now();
+    jdbcTemplate.update(
+        """
+        insert into webhook_event
+            (id, endpoint_id, event_type, body, idempotency_key, created_at)
+        values (?, ?, ?, ?, ?, ?)
+        """,
+        eventId,
+        endpointId,
+        "demo.cancellation",
+        "{\"type\":\"demo.cancellation\",\"data\":{}}",
+        "integration-cancel-" + eventId,
+        Timestamp.from(now));
+    jdbcTemplate.update(
+        """
+        insert into delivery_job
+            (id, event_id, endpoint_id, status, attempt_count, max_attempts,
+             next_attempt_at, created_at, updated_at, version)
+        values (?, ?, ?, ?, 0, 3, ?, ?, ?, 0)
+        """,
+        deliveryId,
+        eventId,
+        endpointId,
+        status,
+        Timestamp.from(nextAttemptAt),
+        Timestamp.from(now),
+        Timestamp.from(now));
+    return deliveryId;
+  }
+
   private static HttpServer startTarget() {
     try {
       HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-      server.createContext("/hooks", exchange -> handleTarget(exchange, false));
-      server.createContext("/hooks/flaky", exchange -> handleTarget(exchange, true));
+      server.createContext("/hooks", exchange -> handleTarget(exchange, false, false));
+      server.createContext("/hooks/flaky", exchange -> handleTarget(exchange, true, false));
+      server.createContext("/hooks/cancel", exchange -> handleTarget(exchange, false, true));
       server.start();
       return server;
     } catch (IOException exception) {
@@ -360,7 +464,8 @@ class WebhookFlowIT {
     }
   }
 
-  private static void handleTarget(HttpExchange exchange, boolean flaky) throws IOException {
+  private static void handleTarget(HttpExchange exchange, boolean flaky, boolean cancellation)
+      throws IOException {
     String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
     String timestamp = exchange.getRequestHeaders().getFirst("X-Webhook-Timestamp");
     String supplied = exchange.getRequestHeaders().getFirst("X-Webhook-Signature");
@@ -371,6 +476,9 @@ class WebhookFlowIT {
     int statusCode;
     if (!expected.equals(supplied)) {
       statusCode = 401;
+    } else if (cancellation) {
+      CANCELED_TARGET_COUNT.incrementAndGet();
+      statusCode = 204;
     } else if (flaky) {
       statusCode = FLAKY_COUNT.incrementAndGet() <= 2 ? 503 : 204;
     } else {

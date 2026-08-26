@@ -46,6 +46,11 @@ public class DeliveryController {
     return service.replay(id);
   }
 
+  @PostMapping("/{id}/cancel")
+  DeliveryResponse cancel(@PathVariable UUID id) {
+    return service.cancel(id);
+  }
+
   @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
   SseEmitter stream() {
     return updates.subscribe();

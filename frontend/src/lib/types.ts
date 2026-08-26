@@ -3,7 +3,8 @@ export type DeliveryStatus =
   | "PROCESSING"
   | "RETRY_SCHEDULED"
   | "SUCCEEDED"
-  | "DEAD";
+  | "DEAD"
+  | "CANCELED";
 
 export interface Endpoint {
   id: string;

@@ -48,7 +48,10 @@ stateDiagram-v2
     PROCESSING --> RETRY_SCHEDULED: transient failure
     RETRY_SCHEDULED --> PROCESSING: due + lease
     PROCESSING --> DEAD: permanent / exhausted
+    PENDING --> CANCELED: operator cancel
+    RETRY_SCHEDULED --> CANCELED: operator cancel
     DEAD --> PENDING: manual replay
+    CANCELED --> PENDING: manual replay
 ```
 
 Workers claim due jobs with `FOR UPDATE SKIP LOCKED`. The transaction only marks jobs as `PROCESSING`; the HTTP request executes after commit. A worker that crashes can leave a lease behind, so later polls reclaim jobs older than the configured lease timeout.
@@ -85,6 +88,7 @@ The demo receiver exposes `/hooks/flaky?failures=N` for a bounded, deterministic
 - Endpoint secrets are encrypted before persistence and decrypted only for delivery.
 - Endpoint activation changes require the version last observed by the operator; stale writes return HTTP `409`.
 - Deactivation blocks new event acceptance while already accepted delivery jobs continue under the existing immutable-event contract.
+- Cancellation locks the delivery row before checking state. This serializes with worker `SKIP LOCKED` claims: only `PENDING` and `RETRY_SCHEDULED` can become `CANCELED`, and repeated cancellation is idempotent.
 - A manual replay extends the attempt budget without resetting the historical attempt sequence.
 - Database time is stored as UTC `timestamptz`; application time comes from an injected `Clock`.
 - Frontend updates use SSE, while a manual refresh remains available as a recovery path.
@@ -150,4 +154,5 @@ Worker 使用 `FOR UPDATE SKIP LOCKED` 抢占到期任务。事务只负责将�
 
 - Endpoint 启停变更必须携带运维端最后观察到的版本；陈旧写入返回 HTTP `409`。
 - 停用会阻止接收新事件，已经接收的投递任务仍按现有不可变事件契约继续执行。
+- 取消操作会先锁定任务行再检查状态，并与 Worker 的 `SKIP LOCKED` 抢占互斥；只有 `PENDING` 与 `RETRY_SCHEDULED` 可进入 `CANCELED`，重复取消保持幂等。
 - 状态变更日志仅在事务提交后产生，回滚操作不会形成已完成的运行证据。

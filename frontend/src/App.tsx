@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { StatusBadge } from "./components/StatusBadge";
 import { api } from "./lib/api";
 import type { Delivery, DeliveryDetail, DeliveryStats, Endpoint } from "./lib/types";
-import { formatDuration, formatTimestamp, parseEventData, selectActiveEndpoint } from "./lib/view";
+import {
+  canCancelDelivery,
+  formatDuration,
+  formatTimestamp,
+  parseEventData,
+  selectActiveEndpoint,
+} from "./lib/view";
 
 type Locale = "en" | "zh";
 
@@ -24,6 +30,7 @@ const copy = {
     succeeded: "Succeeded",
     retrying: "Retrying",
     dead: "Dead letters",
+    canceled: "Canceled",
     endpointTitle: "Register endpoint",
     endpointHelp: "Secrets are encrypted before persistence and never returned by the API.",
     name: "Name",
@@ -46,6 +53,8 @@ const copy = {
     updated: "Updated",
     action: "Action",
     replay: "Replay",
+    cancelDelivery: "Cancel",
+    cancelConfirm: "Cancel this queued delivery? It can be replayed later.",
     inspect: "Inspect",
     historyTitle: "Attempt timeline",
     historyHelp: "Committed outcomes only. Signing secrets and request signatures are never stored.",
@@ -72,6 +81,7 @@ const copy = {
     succeeded: "推送成功",
     retrying: "等待重试",
     dead: "死信任务",
+    canceled: "已取消",
     endpointTitle: "注册 Endpoint",
     endpointHelp: "签名密钥加密后持久化，API 不会返回密钥内容。",
     name: "名称",
@@ -94,6 +104,8 @@ const copy = {
     updated: "更新时间",
     action: "操作",
     replay: "重新投递",
+    cancelDelivery: "取消任务",
+    cancelConfirm: "确认取消这条排队中的推送任务？之后仍可重新投递。",
     inspect: "查看详情",
     historyTitle: "推送尝试时间线",
     historyHelp: "这里只展示事务已提交的结果；签名密钥和请求签名不会被保存。",
@@ -114,7 +126,14 @@ const copy = {
 
 const emptyStats: DeliveryStats = {
   total: 0,
-  byStatus: { PENDING: 0, PROCESSING: 0, RETRY_SCHEDULED: 0, SUCCEEDED: 0, DEAD: 0 },
+  byStatus: {
+    PENDING: 0,
+    PROCESSING: 0,
+    RETRY_SCHEDULED: 0,
+    SUCCEEDED: 0,
+    DEAD: 0,
+    CANCELED: 0,
+  },
 };
 
 export function App() {
@@ -175,6 +194,7 @@ export function App() {
       [t.succeeded, stats.byStatus.SUCCEEDED],
       [t.retrying, stats.byStatus.RETRY_SCHEDULED],
       [t.dead, stats.byStatus.DEAD],
+      [t.canceled, stats.byStatus.CANCELED],
     ],
     [stats, t],
   );
@@ -223,6 +243,15 @@ export function App() {
     await run(async () => {
       await api.replay(id);
       setNotice(locale === "zh" ? "推送任务已重新进入队列。" : "Delivery queued for replay.");
+      await load();
+    });
+  }
+
+  async function cancelDelivery(id: string) {
+    if (!window.confirm(t.cancelConfirm)) return;
+    await run(async () => {
+      await api.cancel(id);
+      setNotice(locale === "zh" ? "推送任务已取消。" : "Delivery canceled.");
       await load();
     });
   }
@@ -312,7 +341,7 @@ export function App() {
           <div className="table-heading"><div><p className="section-index">03</p><h2>{t.recentTitle}</h2></div><button className="ghost-button" type="button" onClick={() => void load()}>{t.refresh}</button></div>
           {deliveries.length === 0 ? <p className="empty-state">{t.empty}</p> : (
             <div className="table-wrap"><table><thead><tr><th>Event</th><th>{t.target}</th><th>Status</th><th>{t.attempts}</th><th>{t.response}</th><th>{t.updated}</th><th>{t.action}</th></tr></thead>
-              <tbody>{deliveries.map((delivery) => <tr key={delivery.id}><td><strong>{delivery.eventType}</strong><code>{delivery.eventId.slice(0, 8)}</code></td><td><strong>{delivery.endpointName}</strong><small title={delivery.endpointUrl}>{delivery.endpointUrl}</small></td><td><StatusBadge status={delivery.status} /></td><td>{delivery.attemptCount} / {delivery.maxAttempts}</td><td>{delivery.lastStatusCode ?? delivery.lastError ?? "—"}</td><td>{formatTimestamp(delivery.updatedAt, locale)}</td><td><div className="row-actions"><button className="text-button" disabled={busy} type="button" onClick={() => void inspect(delivery.id)}>{t.inspect}</button><button className="text-button" disabled={busy || delivery.status === "PROCESSING"} type="button" onClick={() => void replay(delivery.id)}>{t.replay}</button></div></td></tr>)}</tbody>
+              <tbody>{deliveries.map((delivery) => <tr key={delivery.id}><td><strong>{delivery.eventType}</strong><code>{delivery.eventId.slice(0, 8)}</code></td><td><strong>{delivery.endpointName}</strong><small title={delivery.endpointUrl}>{delivery.endpointUrl}</small></td><td><StatusBadge status={delivery.status} /></td><td>{delivery.attemptCount} / {delivery.maxAttempts}</td><td>{delivery.lastStatusCode ?? delivery.lastError ?? "—"}</td><td>{formatTimestamp(delivery.updatedAt, locale)}</td><td><div className="row-actions"><button className="text-button" disabled={busy} type="button" onClick={() => void inspect(delivery.id)}>{t.inspect}</button><button className="text-button" disabled={busy || delivery.status === "PROCESSING"} type="button" onClick={() => void replay(delivery.id)}>{t.replay}</button>{canCancelDelivery(delivery.status) && <button className="text-button danger-action" disabled={busy} type="button" onClick={() => void cancelDelivery(delivery.id)}>{t.cancelDelivery}</button>}</div></td></tr>)}</tbody>
             </table></div>
           )}
           {selectedDelivery && (

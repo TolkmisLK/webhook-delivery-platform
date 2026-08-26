@@ -1,5 +1,6 @@
 package dev.ncc.webhook.delivery;
 
+import dev.ncc.webhook.common.DeliveryStateConflictException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -121,6 +122,20 @@ public class DeliveryJob {
     lastError = null;
     clearLease();
     updatedAt = now;
+  }
+
+  public boolean cancel(Instant now) {
+    if (status == DeliveryStatus.CANCELED) {
+      return false;
+    }
+    if (status != DeliveryStatus.PENDING && status != DeliveryStatus.RETRY_SCHEDULED) {
+      throw new DeliveryStateConflictException(
+          "Delivery cannot be canceled from status " + status.name());
+    }
+    status = DeliveryStatus.CANCELED;
+    clearLease();
+    updatedAt = now;
+    return true;
   }
 
   private void clearLease() {

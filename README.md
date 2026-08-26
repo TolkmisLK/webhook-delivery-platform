@@ -29,6 +29,7 @@ The first release intentionally uses a modular monolith and a PostgreSQL-backed 
 - Controlled transient-failure receiver for demonstrating retry recovery
 - Reversible Endpoint activation with optimistic version checks and stable conflict responses
 - Prometheus queue-health gauges with bounded status tags and runnable-job age
+- Race-safe, idempotent cancellation for queued delivery jobs
 
 ### Quick start
 
@@ -104,7 +105,7 @@ The backend gate also checks Google Java Format and verifies the Spring Modulith
 
 ### Current scope
 
-`v0.3` adds reversible Endpoint activation, optimistic version checks, active-target operator controls, and bounded Prometheus queue-health signals. URL editing and secret rotation remain deferred until pending-job configuration snapshot semantics are defined.
+`v0.4` starts with race-safe cancellation for queued delivery jobs. A successful cancel serializes with worker claims, remains visible in the audit view, and can be reversed through replay. URL editing and secret rotation remain deferred until pending-job configuration snapshot semantics are defined.
 
 ## 中文
 
@@ -130,6 +131,7 @@ Webhook Delivery Platform 是一个生产风格的全栈可靠事件投递参考
 - 用于演示重试恢复的可控瞬时失败 Receiver
 - 支持乐观版本校验与稳定冲突响应的可逆 Endpoint 启停控制
 - 使用固定状态标签与可运行任务年龄的 Prometheus 队列健康指标
+- 支持并发安全和幂等操作的排队任务取消能力
 
 ### 快速开始
 
@@ -208,7 +210,7 @@ PostgreSQL 集成测试会启动真实目标服务，通过 API 验证幂等接�
 
 ### 当前范围
 
-`v0.3` 增加可逆 Endpoint 启停、乐观版本校验、只向已启用目标发布事件的运维控制，以及低基数 Prometheus 队列健康信号。Endpoint URL 编辑与密钥轮换继续暂缓，直至待处理任务的配置快照语义明确。
+`v0.4` 首先增加排队任务的并发安全取消能力。取消成功会与 Worker 抢占互斥，任务仍保留在审查视图中，并可通过重新投递恢复。Endpoint URL 编辑与密钥轮换继续暂缓，直至待处理任务的配置快照语义明确。
 
 ## License
 

@@ -39,10 +39,11 @@ class QueueHealthMetricsTest {
     metrics.refresh();
 
     assertThat(registry.find("webhook.delivery.jobs").gauges())
-        .hasSize(5)
+        .hasSize(6)
         .allSatisfy(gauge -> assertThat(gauge.getId().getTags()).hasSize(1))
         .extracting(gauge -> gauge.getId().getTag("status"))
-        .containsExactlyInAnyOrder("pending", "processing", "retry_scheduled", "succeeded", "dead");
+        .containsExactlyInAnyOrder(
+            "pending", "processing", "retry_scheduled", "succeeded", "dead", "canceled");
     assertThat(registry.get("webhook.delivery.jobs").tag("status", "pending").gauge().value())
         .isEqualTo(3);
     assertThat(registry.get("webhook.delivery.jobs").tag("status", "processing").gauge().value())
