@@ -4,6 +4,7 @@ import dev.ncc.webhook.config.DeliveryProperties;
 import dev.ncc.webhook.event.DeliverySubmission;
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,13 +13,15 @@ class DeliverySubmissionService implements DeliverySubmission {
 
   private final DeliveryJobRepository repository;
   private final DeliveryProperties properties;
-  private final DeliveryUpdates updates;
+  private final ApplicationEventPublisher events;
 
   DeliverySubmissionService(
-      DeliveryJobRepository repository, DeliveryProperties properties, DeliveryUpdates updates) {
+      DeliveryJobRepository repository,
+      DeliveryProperties properties,
+      ApplicationEventPublisher events) {
     this.repository = repository;
     this.properties = properties;
-    this.updates = updates;
+    this.events = events;
   }
 
   @Override
@@ -37,7 +40,12 @@ class DeliverySubmissionService implements DeliverySubmission {
                       properties.getMaxAttempts(),
                       acceptedAt);
               repository.save(job);
-              updates.publish(job.getId(), DeliveryStatus.PENDING.name());
+              events.publishEvent(
+                  new DeliveryStateChanged(
+                      job.getId(),
+                      null,
+                      DeliveryStatus.PENDING,
+                      DeliveryStateChangeSource.ACCEPTED));
               return accepted(job);
             });
   }

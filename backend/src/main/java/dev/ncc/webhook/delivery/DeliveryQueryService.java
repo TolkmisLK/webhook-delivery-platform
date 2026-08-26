@@ -15,6 +15,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +27,7 @@ class DeliveryQueryService {
   private final DeliveryAttemptRepository attemptRepository;
   private final WebhookEventRepository eventRepository;
   private final WebhookEndpointRepository endpointRepository;
-  private final DeliveryUpdates updates;
+  private final ApplicationEventPublisher events;
   private final DeliveryProperties properties;
   private final Clock clock;
 
@@ -35,14 +36,14 @@ class DeliveryQueryService {
       DeliveryAttemptRepository attemptRepository,
       WebhookEventRepository eventRepository,
       WebhookEndpointRepository endpointRepository,
-      DeliveryUpdates updates,
+      ApplicationEventPublisher events,
       DeliveryProperties properties,
       Clock clock) {
     this.jobRepository = jobRepository;
     this.attemptRepository = attemptRepository;
     this.eventRepository = eventRepository;
     this.endpointRepository = endpointRepository;
-    this.updates = updates;
+    this.events = events;
     this.properties = properties;
     this.clock = clock;
   }
@@ -83,8 +84,11 @@ class DeliveryQueryService {
         jobRepository
             .findById(id)
             .orElseThrow(() -> new NotFoundException("Delivery job was not found"));
+    DeliveryStatus previousStatus = job.getStatus();
     job.replay(Instant.now(clock), properties.getMaxAttempts());
-    updates.publish(id, DeliveryStatus.PENDING.name());
+    events.publishEvent(
+        new DeliveryStateChanged(
+            id, previousStatus, DeliveryStatus.PENDING, DeliveryStateChangeSource.MANUAL_REPLAY));
     return toResponse(job);
   }
 
@@ -94,8 +98,14 @@ class DeliveryQueryService {
         jobRepository
             .findByIdForUpdate(id)
             .orElseThrow(() -> new NotFoundException("Delivery job was not found"));
+    DeliveryStatus previousStatus = job.getStatus();
     if (job.cancel(Instant.now(clock))) {
-      updates.publish(id, DeliveryStatus.CANCELED.name());
+      events.publishEvent(
+          new DeliveryStateChanged(
+              id,
+              previousStatus,
+              DeliveryStatus.CANCELED,
+              DeliveryStateChangeSource.MANUAL_CANCEL));
     }
     return toResponse(job);
   }
