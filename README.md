@@ -30,6 +30,7 @@ The first release intentionally uses a modular monolith and a PostgreSQL-backed 
 - Reversible Endpoint activation with optimistic version checks and stable conflict responses
 - Prometheus queue-health gauges with bounded status tags and runnable-job age
 - Race-safe, idempotent cancellation for queued delivery jobs
+- Commit-consistent SSE state notifications and after-commit operator action logs
 
 ### Quick start
 
@@ -132,6 +133,7 @@ Webhook Delivery Platform 是一个生产风格的全栈可靠事件投递参考
 - 支持乐观版本校验与稳定冲突响应的可逆 Endpoint 启停控制
 - 使用固定状态标签与可运行任务年龄的 Prometheus 队列健康指标
 - 支持并发安全和幂等操作的排队任务取消能力
+- 只反映已提交状态的 SSE 通知，以及提交后的人工操作日志
 
 ### 快速开始
 

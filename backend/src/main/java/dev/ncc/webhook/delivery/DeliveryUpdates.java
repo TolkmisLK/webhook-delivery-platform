@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Component
@@ -28,8 +30,9 @@ public class DeliveryUpdates {
     return emitter;
   }
 
-  public void publish(UUID deliveryId, String status) {
-    Update update = new Update(deliveryId, status, Instant.now());
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  void publishCommitted(DeliveryStateChanged event) {
+    Update update = new Update(event.jobId(), event.status().name(), Instant.now());
     for (SseEmitter emitter : emitters) {
       try {
         emitter.send(SseEmitter.event().name("delivery").data(update));

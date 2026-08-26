@@ -14,7 +14,6 @@ class DeliveryOutcomeService {
   private final DeliveryJobRepository jobRepository;
   private final DeliveryAttemptRepository attemptRepository;
   private final RetryPolicy retryPolicy;
-  private final DeliveryUpdates updates;
   private final ApplicationEventPublisher events;
   private final Clock clock;
 
@@ -22,13 +21,11 @@ class DeliveryOutcomeService {
       DeliveryJobRepository jobRepository,
       DeliveryAttemptRepository attemptRepository,
       RetryPolicy retryPolicy,
-      DeliveryUpdates updates,
       ApplicationEventPublisher events,
       Clock clock) {
     this.jobRepository = jobRepository;
     this.attemptRepository = attemptRepository;
     this.retryPolicy = retryPolicy;
-    this.updates = updates;
     this.events = events;
     this.clock = clock;
   }
@@ -74,7 +71,12 @@ class DeliveryOutcomeService {
     events.publishEvent(
         new DeliveryAttemptCompleted(
             job.getId(), attempt, outcome, result.statusCode(), result.durationMs()));
-    updates.publish(job.getId(), outcome.name());
+    events.publishEvent(
+        new DeliveryStateChanged(
+            job.getId(),
+            DeliveryStatus.PROCESSING,
+            outcome,
+            DeliveryStateChangeSource.ATTEMPT_OUTCOME));
   }
 
   @Transactional
@@ -114,6 +116,11 @@ class DeliveryOutcomeService {
             now));
     events.publishEvent(
         new DeliveryAttemptCompleted(job.getId(), attempt, outcome, null, durationMs));
-    updates.publish(job.getId(), outcome.name());
+    events.publishEvent(
+        new DeliveryStateChanged(
+            job.getId(),
+            DeliveryStatus.PROCESSING,
+            outcome,
+            DeliveryStateChangeSource.ATTEMPT_OUTCOME));
   }
 }
