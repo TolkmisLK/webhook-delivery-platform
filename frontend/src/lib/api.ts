@@ -30,6 +30,11 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ active, expectedVersion }),
     }),
+  rotateEndpointSecret: (id: string, newSecret: string, expectedVersion: number) =>
+    request<Endpoint>(`/api/endpoints/${id}/secret`, {
+      method: "PATCH",
+      body: JSON.stringify({ newSecret, expectedVersion }),
+    }),
   publishEvent: (input: {
     endpointId: string;
     eventType: string;

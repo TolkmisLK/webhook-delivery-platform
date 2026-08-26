@@ -69,6 +69,12 @@ const copy = {
     inactive: "INACTIVE",
     activate: "Activate",
     deactivate: "Deactivate",
+    rotateSecret: "Rotate secret",
+    newSigningSecret: "New signing secret",
+    rotateSecretHelp: "Keep both secrets active at the receiver until older deliveries finish.",
+    rotateSecretConfirm: "Rotate this signing secret? Existing deliveries will keep using the old secret.",
+    confirmRotation: "Confirm rotation",
+    cancelRotation: "Cancel",
     noActiveEndpoints: "No active endpoint",
   },
   zh: {
@@ -120,6 +126,12 @@ const copy = {
     inactive: "已停用",
     activate: "启用",
     deactivate: "停用",
+    rotateSecret: "轮换密钥",
+    newSigningSecret: "新签名密钥",
+    rotateSecretHelp: "旧任务结束前，请让接收端同时接受新旧密钥。",
+    rotateSecretConfirm: "确认轮换签名密钥？已接收任务仍会使用旧密钥。",
+    confirmRotation: "确认轮换",
+    cancelRotation: "取消",
     noActiveEndpoints: "暂无已启用 Endpoint",
   },
 } as const;
@@ -151,6 +163,7 @@ export function App() {
     url: "http://receiver:8090/hooks",
     secret: "local-demo-secret",
   });
+  const [secretRotation, setSecretRotation] = useState({ endpointId: "", newSecret: "" });
   const [eventForm, setEventForm] = useState<EventFormState>({
     endpointId: "",
     eventType: "demo.completed",
@@ -235,6 +248,18 @@ export function App() {
           ? `Endpoint 已${updated.active ? "启用" : "停用"}。`
           : `Endpoint ${updated.active ? "activated" : "deactivated"}.`,
       );
+      await load();
+    });
+  }
+
+  async function rotateEndpointSecret(event: FormEvent, endpoint: Endpoint) {
+    event.preventDefault();
+    if (!window.confirm(t.rotateSecretConfirm)) return;
+    const newSecret = secretRotation.newSecret;
+    setSecretRotation({ endpointId: "", newSecret: "" });
+    await run(async () => {
+      await api.rotateEndpointSecret(endpoint.id, newSecret, endpoint.version);
+      setNotice(locale === "zh" ? "Endpoint 签名密钥已轮换。" : "Endpoint signing secret rotated.");
       await load();
     });
   }
@@ -378,7 +403,7 @@ export function App() {
 
         <section className="panel endpoint-list">
           <div><p className="section-index">04</p><h2>{t.registered}</h2></div>
-          {endpoints.length === 0 ? <p>{t.noEndpoints}</p> : <ul>{endpoints.map((endpoint) => <li key={endpoint.id}><span><strong>{endpoint.name}</strong><small>{endpoint.url}</small></span><span className="endpoint-actions"><span className={`endpoint-state${endpoint.active ? "" : " inactive"}`}>{endpoint.active ? t.active : t.inactive}</span><button className="text-button" disabled={busy} type="button" onClick={() => void setEndpointActive(endpoint)}>{endpoint.active ? t.deactivate : t.activate}</button></span></li>)}</ul>}
+          {endpoints.length === 0 ? <p>{t.noEndpoints}</p> : <ul>{endpoints.map((endpoint) => <li key={endpoint.id}><div className="endpoint-row"><span><strong>{endpoint.name}</strong><small>{endpoint.url}</small></span><span className="endpoint-actions"><span className={`endpoint-state${endpoint.active ? "" : " inactive"}`}>{endpoint.active ? t.active : t.inactive}</span><button className="text-button" disabled={busy} type="button" onClick={() => void setEndpointActive(endpoint)}>{endpoint.active ? t.deactivate : t.activate}</button><button className="text-button" disabled={busy} type="button" onClick={() => setSecretRotation({ endpointId: endpoint.id, newSecret: "" })}>{t.rotateSecret}</button></span></div>{secretRotation.endpointId === endpoint.id && <form className="secret-rotation-form" onSubmit={(event) => void rotateEndpointSecret(event, endpoint)}><label>{t.newSigningSecret}<input autoFocus required minLength={16} maxLength={512} type="password" autoComplete="new-password" value={secretRotation.newSecret} onChange={(event) => setSecretRotation({ endpointId: endpoint.id, newSecret: event.target.value })} /></label><p>{t.rotateSecretHelp}</p><span className="rotation-actions"><button className="primary-button" disabled={busy} type="submit">{t.confirmRotation}</button><button className="ghost-button" disabled={busy} type="button" onClick={() => setSecretRotation({ endpointId: "", newSecret: "" })}>{t.cancelRotation}</button></span></form>}</li>)}</ul>}
         </section>
       </main>
 

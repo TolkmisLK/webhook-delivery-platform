@@ -68,6 +68,34 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/VersionConflict"
+  /api/endpoints/{endpointId}/secret:
+    patch:
+      operationId: rotateEndpointSecret
+      summary: Rotate an endpoint signing secret / 轮换 Endpoint 签名密钥
+      description: |
+        Replaces the encrypted signing secret for deliveries accepted after this update.
+        Deliveries accepted before rotation retain their immutable secret snapshot.
+      parameters:
+        - $ref: "#/components/parameters/EndpointId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RotateEndpointSecret"
+      responses:
+        "200":
+          description: Secret rotated. No secret material is returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Endpoint"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/VersionConflict"
   /api/events:
     post:
       operationId: publishEvent
@@ -244,6 +272,16 @@ components:
       required: [active, expectedVersion]
       properties:
         active: { type: boolean }
+        expectedVersion: { type: integer, minimum: 0 }
+    RotateEndpointSecret:
+      type: object
+      required: [newSecret, expectedVersion]
+      properties:
+        newSecret:
+          type: string
+          minLength: 16
+          maxLength: 512
+          writeOnly: true
         expectedVersion: { type: integer, minimum: 0 }
     Endpoint:
       type: object

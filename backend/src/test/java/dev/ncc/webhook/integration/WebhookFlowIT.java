@@ -51,6 +51,8 @@ class WebhookFlowIT {
   private static final AtomicInteger CANCELED_TARGET_COUNT = new AtomicInteger();
   private static final AtomicInteger SNAPSHOT_ORIGINAL_COUNT = new AtomicInteger();
   private static final AtomicInteger SNAPSHOT_MUTATED_COUNT = new AtomicInteger();
+  private static final AtomicInteger ROTATION_OLD_SECRET_COUNT = new AtomicInteger();
+  private static final AtomicInteger ROTATION_NEW_SECRET_COUNT = new AtomicInteger();
   private static final HttpServer TARGET = startTarget();
 
   @Container
@@ -372,6 +374,154 @@ class WebhookFlowIT {
   }
 
   @Test
+  void rotatesEndpointSecretWithoutChangingAcceptedDeliverySignatures() throws Exception {
+    ROTATION_OLD_SECRET_COUNT.set(0);
+    ROTATION_NEW_SECRET_COUNT.set(0);
+    String endpointJson =
+        mockMvc
+            .perform(
+                post("/api/endpoints")
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "name": "rotation target",
+                          "url": "http://127.0.0.1:%d/hooks/rotation",
+                          "secret": "integration-old-secret"
+                        }
+                        """
+                            .formatted(TARGET.getAddress().getPort())))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    var endpoint = jsonMapper.readTree(endpointJson);
+    UUID endpointId = UUID.fromString(endpoint.get("id").asText());
+    UUID acceptedBeforeRotation =
+        insertDelivery(endpointId, "PENDING", Instant.now().plusSeconds(60));
+    String oldEncryptedSecret =
+        jdbcTemplate.queryForObject(
+            "select encrypted_secret from webhook_endpoint where id = ?", String.class, endpointId);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select encrypted_secret from delivery_job where id = ?",
+                String.class,
+                acceptedBeforeRotation))
+        .isEqualTo(oldEncryptedSecret);
+
+    String rotationJson =
+        mockMvc
+            .perform(
+                patch("/api/endpoints/{id}/secret", endpointId)
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "newSecret": "integration-new-secret",
+                          "expectedVersion": 0
+                        }
+                        """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    var rotated = jsonMapper.readTree(rotationJson);
+    assertThat(rotated.get("version").asLong()).isEqualTo(1);
+    assertThat(rotated.has("secret")).isFalse();
+    assertThat(rotationJson)
+        .doesNotContain("integration-old-secret", "integration-new-secret", oldEncryptedSecret);
+
+    String newEncryptedSecret =
+        jdbcTemplate.queryForObject(
+            "select encrypted_secret from webhook_endpoint where id = ?", String.class, endpointId);
+    assertThat(newEncryptedSecret)
+        .isNotEqualTo(oldEncryptedSecret)
+        .doesNotContain("integration-new-secret");
+
+    String conflictJson =
+        mockMvc
+            .perform(
+                patch("/api/endpoints/{id}/secret", endpointId)
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "newSecret": "integration-stale-secret",
+                          "expectedVersion": 0
+                        }
+                        """))
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(jsonMapper.readTree(conflictJson).get("code").asText())
+        .isEqualTo("version_conflict");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select encrypted_secret from webhook_endpoint where id = ?",
+                String.class,
+                endpointId))
+        .isEqualTo(newEncryptedSecret);
+
+    mockMvc
+        .perform(
+            patch("/api/endpoints/{id}/secret", endpointId)
+                .contentType("application/json")
+                .content("{\"newSecret\":\"too-short\",\"expectedVersion\":1}"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            patch("/api/endpoints/{id}/secret", UUID.randomUUID())
+                .contentType("application/json")
+                .content(
+                    """
+                    {
+                      "newSecret": "integration-missing-secret",
+                      "expectedVersion": 0
+                    }
+                    """))
+        .andExpect(status().isNotFound());
+
+    String eventJson =
+        mockMvc
+            .perform(
+                post("/api/events")
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "endpointId": "%s",
+                          "eventType": "demo.rotation-new",
+                          "idempotencyKey": "integration-rotation-%s",
+                          "data": {"secretGeneration": "new"}
+                        }
+                        """
+                            .formatted(endpointId, UUID.randomUUID())))
+            .andExpect(status().isAccepted())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    UUID acceptedAfterRotation =
+        UUID.fromString(jsonMapper.readTree(eventJson).get("deliveryId").asText());
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select encrypted_secret from delivery_job where id = ?",
+                String.class,
+                acceptedAfterRotation))
+        .isEqualTo(newEncryptedSecret);
+    awaitSuccess(acceptedAfterRotation);
+
+    jdbcTemplate.update(
+        "update delivery_job set next_attempt_at = ? where id = ?",
+        Timestamp.from(Instant.now().minusSeconds(1)),
+        acceptedBeforeRotation);
+    awaitSuccess(acceptedBeforeRotation);
+
+    assertThat(ROTATION_NEW_SECRET_COUNT.get()).isEqualTo(1);
+    assertThat(ROTATION_OLD_SECRET_COUNT.get()).isEqualTo(1);
+  }
+
+  @Test
   void exposesBoundedPrometheusQueueMetrics() throws Exception {
     String exposition =
         mockMvc
@@ -525,6 +675,7 @@ class WebhookFlowIT {
       server.createContext(
           "/hooks/snapshot-mutated",
           exchange -> handleSnapshotTarget(exchange, SNAPSHOT_MUTATED_COUNT));
+      server.createContext("/hooks/rotation", WebhookFlowIT::handleRotationTarget);
       server.start();
       return server;
     } catch (IOException exception) {
@@ -572,6 +723,25 @@ class WebhookFlowIT {
     int statusCode = expected.equals(supplied) ? 204 : 401;
     if (statusCode == 204) {
       counter.incrementAndGet();
+    }
+    exchange.sendResponseHeaders(statusCode, -1);
+    exchange.close();
+  }
+
+  private static void handleRotationTarget(HttpExchange exchange) throws IOException {
+    String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+    String timestamp = exchange.getRequestHeaders().getFirst("X-Webhook-Timestamp");
+    String supplied = exchange.getRequestHeaders().getFirst("X-Webhook-Signature");
+    HmacSigner signer = new HmacSigner();
+    String oldSignature = signer.sign("integration-old-secret", Long.parseLong(timestamp), body);
+    String newSignature = signer.sign("integration-new-secret", Long.parseLong(timestamp), body);
+    int statusCode = 401;
+    if (oldSignature.equals(supplied)) {
+      ROTATION_OLD_SECRET_COUNT.incrementAndGet();
+      statusCode = 204;
+    } else if (newSignature.equals(supplied)) {
+      ROTATION_NEW_SECRET_COUNT.incrementAndGet();
+      statusCode = 204;
     }
     exchange.sendResponseHeaders(statusCode, -1);
     exchange.close();
