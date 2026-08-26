@@ -6,6 +6,11 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- Race-safe, idempotent cancellation for queued delivery jobs with a stable conflict response.
+- Bilingual cancellation controls and bounded Prometheus coverage for the `CANCELED` state.
+
 ## [0.3.0] - 2026-08-25
 
 ### Added / 新增

@@ -1,17 +1,23 @@
 package dev.ncc.webhook.delivery;
 
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface DeliveryJobRepository extends JpaRepository<DeliveryJob, UUID> {
 
   Optional<DeliveryJob> findByEventId(UUID eventId);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select job from DeliveryJob job where job.id = :id")
+  Optional<DeliveryJob> findByIdForUpdate(@Param("id") UUID id);
 
   long countByStatus(DeliveryStatus status);
 

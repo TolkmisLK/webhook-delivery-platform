@@ -45,4 +45,6 @@ export const api = {
   getStats: () => request<DeliveryStats>("/api/deliveries/stats"),
   replay: (id: string) =>
     request<Delivery>(`/api/deliveries/${id}/replay`, { method: "POST" }),
+  cancel: (id: string) =>
+    request<Delivery>(`/api/deliveries/${id}/cancel`, { method: "POST" }),
 };

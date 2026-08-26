@@ -170,7 +170,7 @@ main {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 22px;
 }
@@ -292,6 +292,10 @@ textarea:hover {
   border: 0;
   cursor: pointer;
   font-weight: 780;
+}
+
+.text-button.danger-action {
+  color: var(--danger);
 }
 
 .row-actions {

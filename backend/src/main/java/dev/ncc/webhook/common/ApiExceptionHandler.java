@@ -36,6 +36,12 @@ public class ApiExceptionHandler {
     return response(HttpStatus.CONFLICT, "version_conflict", message, Map.of());
   }
 
+  @ExceptionHandler(DeliveryStateConflictException.class)
+  ResponseEntity<ApiError> handleDeliveryStateConflict(DeliveryStateConflictException exception) {
+    return response(
+        HttpStatus.CONFLICT, "delivery_state_conflict", exception.getMessage(), Map.of());
+  }
+
   @ExceptionHandler(IllegalArgumentException.class)
   ResponseEntity<ApiError> handleBadRequest(IllegalArgumentException exception) {
     return response(HttpStatus.BAD_REQUEST, "invalid_request", exception.getMessage(), Map.of());

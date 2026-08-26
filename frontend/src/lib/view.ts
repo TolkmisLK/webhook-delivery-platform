@@ -27,6 +27,10 @@ export function statusTone(status: DeliveryStatus): "neutral" | "active" | "succ
   return "neutral";
 }
 
+export function canCancelDelivery(status: DeliveryStatus): boolean {
+  return status === "PENDING" || status === "RETRY_SCHEDULED";
+}
+
 export function parseEventData(value: string): unknown {
   const parsed: unknown = JSON.parse(value);
   if (parsed === null || typeof parsed !== "object") {
