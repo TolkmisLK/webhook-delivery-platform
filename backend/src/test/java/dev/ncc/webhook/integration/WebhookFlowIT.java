@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sun.net.httpserver.HttpExchange;
@@ -53,6 +54,8 @@ class WebhookFlowIT {
   private static final AtomicInteger SNAPSHOT_MUTATED_COUNT = new AtomicInteger();
   private static final AtomicInteger ROTATION_OLD_SECRET_COUNT = new AtomicInteger();
   private static final AtomicInteger ROTATION_NEW_SECRET_COUNT = new AtomicInteger();
+  private static final AtomicInteger CONFIG_ORIGINAL_COUNT = new AtomicInteger();
+  private static final AtomicInteger CONFIG_UPDATED_COUNT = new AtomicInteger();
   private static final HttpServer TARGET = startTarget();
 
   @Container
@@ -522,6 +525,164 @@ class WebhookFlowIT {
   }
 
   @Test
+  void updatesEndpointConfigurationWithoutRedirectingAcceptedDeliveries() throws Exception {
+    CONFIG_ORIGINAL_COUNT.set(0);
+    CONFIG_UPDATED_COUNT.set(0);
+    String originalUrl =
+        "http://127.0.0.1:%d/hooks/config-original".formatted(TARGET.getAddress().getPort());
+    String updatedUrl =
+        "http://127.0.0.1:%d/hooks/config-updated".formatted(TARGET.getAddress().getPort());
+    String endpointJson =
+        mockMvc
+            .perform(
+                post("/api/endpoints")
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "name": "configuration target",
+                          "url": "%s",
+                          "secret": "integration-secret"
+                        }
+                        """
+                            .formatted(originalUrl)))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    UUID endpointId = UUID.fromString(jsonMapper.readTree(endpointJson).get("id").asText());
+    UUID acceptedBeforeUpdate =
+        insertDelivery(endpointId, "PENDING", Instant.now().plusSeconds(60));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select target_url from delivery_job where id = ?",
+                String.class,
+                acceptedBeforeUpdate))
+        .isEqualTo(originalUrl);
+
+    String updatedJson =
+        mockMvc
+            .perform(
+                put("/api/endpoints/{id}", endpointId)
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "name": "  Updated configuration target  ",
+                          "url": "%s",
+                          "expectedVersion": 0
+                        }
+                        """
+                            .formatted(updatedUrl)))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    var updated = jsonMapper.readTree(updatedJson);
+    assertThat(updated.get("name").asText()).isEqualTo("Updated configuration target");
+    assertThat(updated.get("url").asText()).isEqualTo(updatedUrl);
+    assertThat(updated.get("version").asLong()).isEqualTo(1);
+    assertThat(updatedJson).doesNotContain("integration-secret");
+
+    String noOpJson =
+        mockMvc
+            .perform(
+                put("/api/endpoints/{id}", endpointId)
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "name": " Updated configuration target ",
+                          "url": "%s",
+                          "expectedVersion": 1
+                        }
+                        """
+                            .formatted(updatedUrl)))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(jsonMapper.readTree(noOpJson).get("version").asLong()).isEqualTo(1);
+
+    mockMvc
+        .perform(
+            put("/api/endpoints/{id}", endpointId)
+                .contentType("application/json")
+                .content(
+                    """
+                    {
+                      "name": "unsafe target",
+                      "url": "ftp://example.com/hooks",
+                      "expectedVersion": 1
+                    }
+                    """))
+        .andExpect(status().isBadRequest());
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select url from webhook_endpoint where id = ?", String.class, endpointId))
+        .isEqualTo(updatedUrl);
+
+    String conflictJson =
+        mockMvc
+            .perform(
+                put("/api/endpoints/{id}", endpointId)
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "name": "stale target",
+                          "url": "%s",
+                          "expectedVersion": 0
+                        }
+                        """
+                            .formatted(originalUrl)))
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(jsonMapper.readTree(conflictJson).get("code").asText())
+        .isEqualTo("version_conflict");
+
+    String eventJson =
+        mockMvc
+            .perform(
+                post("/api/events")
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "endpointId": "%s",
+                          "eventType": "demo.configuration-updated",
+                          "idempotencyKey": "integration-config-%s",
+                          "data": {"targetGeneration": "updated"}
+                        }
+                        """
+                            .formatted(endpointId, UUID.randomUUID())))
+            .andExpect(status().isAccepted())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    UUID acceptedAfterUpdate =
+        UUID.fromString(jsonMapper.readTree(eventJson).get("deliveryId").asText());
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select target_url from delivery_job where id = ?",
+                String.class,
+                acceptedAfterUpdate))
+        .isEqualTo(updatedUrl);
+    awaitSuccess(acceptedAfterUpdate);
+
+    jdbcTemplate.update(
+        "update delivery_job set next_attempt_at = ? where id = ?",
+        Timestamp.from(Instant.now().minusSeconds(1)),
+        acceptedBeforeUpdate);
+    awaitSuccess(acceptedBeforeUpdate);
+
+    assertThat(CONFIG_UPDATED_COUNT.get()).isEqualTo(1);
+    assertThat(CONFIG_ORIGINAL_COUNT.get()).isEqualTo(1);
+  }
+
+  @Test
   void exposesBoundedPrometheusQueueMetrics() throws Exception {
     String exposition =
         mockMvc
@@ -676,6 +837,12 @@ class WebhookFlowIT {
           "/hooks/snapshot-mutated",
           exchange -> handleSnapshotTarget(exchange, SNAPSHOT_MUTATED_COUNT));
       server.createContext("/hooks/rotation", WebhookFlowIT::handleRotationTarget);
+      server.createContext(
+          "/hooks/config-original",
+          exchange -> handleSnapshotTarget(exchange, CONFIG_ORIGINAL_COUNT));
+      server.createContext(
+          "/hooks/config-updated",
+          exchange -> handleSnapshotTarget(exchange, CONFIG_UPDATED_COUNT));
       server.start();
       return server;
     } catch (IOException exception) {

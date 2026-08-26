@@ -23,6 +23,11 @@ public final class EndpointDtos {
       @NotBlank @Size(min = 16, max = 512) String newSecret,
       @NotNull @PositiveOrZero Long expectedVersion) {}
 
+  public record UpdateEndpointRequest(
+      @NotBlank @Size(max = 120) String name,
+      @NotBlank @Size(max = 2048) String url,
+      @NotNull @PositiveOrZero Long expectedVersion) {}
+
   public record EndpointResponse(
       UUID id, String name, String url, boolean active, long version, Instant createdAt) {
 

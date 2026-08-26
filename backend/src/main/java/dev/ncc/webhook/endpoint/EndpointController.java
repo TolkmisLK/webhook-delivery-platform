@@ -4,6 +4,7 @@ import dev.ncc.webhook.endpoint.EndpointDtos.CreateEndpointRequest;
 import dev.ncc.webhook.endpoint.EndpointDtos.EndpointResponse;
 import dev.ncc.webhook.endpoint.EndpointDtos.RotateEndpointSecretRequest;
 import dev.ncc.webhook.endpoint.EndpointDtos.SetEndpointStatusRequest;
+import dev.ncc.webhook.endpoint.EndpointDtos.UpdateEndpointRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,6 +38,12 @@ public class EndpointController {
   @GetMapping
   List<EndpointResponse> list() {
     return service.list();
+  }
+
+  @PutMapping("/{endpointId}")
+  EndpointResponse update(
+      @PathVariable UUID endpointId, @Valid @RequestBody UpdateEndpointRequest request) {
+    return service.update(endpointId, request);
   }
 
   @PatchMapping("/{endpointId}/status")

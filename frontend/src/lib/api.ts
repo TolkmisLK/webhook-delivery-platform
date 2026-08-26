@@ -25,6 +25,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+  updateEndpoint: (id: string, name: string, url: string, expectedVersion: number) =>
+    request<Endpoint>(`/api/endpoints/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ name, url, expectedVersion }),
+    }),
   setEndpointActive: (id: string, active: boolean, expectedVersion: number) =>
     request<Endpoint>(`/api/endpoints/${id}/status`, {
       method: "PATCH",
