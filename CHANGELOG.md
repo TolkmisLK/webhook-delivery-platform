@@ -12,6 +12,8 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 - CSRF protection for state-changing API requests, including session-bound token rotation.
 - Stable JSON authentication and authorization errors with request correlation IDs.
 - Bilingual sign-in, signed-in identity, and sign-out controls in the operations console.
+- Bounded per-client and process-wide login throttling with stable HTTP 429 responses.
+- Fixed-cardinality authentication outcome metrics and metadata-only security logs.
 
 ## [0.4.0] - 2026-08-27
 

@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.MDC;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -51,6 +52,19 @@ public class ApiExceptionHandler {
         Map.of());
   }
 
+  @ExceptionHandler(LoginRateLimitException.class)
+  ResponseEntity<ApiError> handleLoginRateLimit(LoginRateLimitException exception) {
+    ApiError error =
+        error(
+            HttpStatus.TOO_MANY_REQUESTS,
+            "login_rate_limited",
+            "Too many login attempts; retry later",
+            Map.of());
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        .header(HttpHeaders.RETRY_AFTER, Long.toString(exception.getRetryAfterSeconds()))
+        .body(error);
+  }
+
   @ExceptionHandler(IllegalArgumentException.class)
   ResponseEntity<ApiError> handleBadRequest(IllegalArgumentException exception) {
     return response(HttpStatus.BAD_REQUEST, "invalid_request", exception.getMessage(), Map.of());
@@ -75,9 +89,12 @@ public class ApiExceptionHandler {
 
   private ResponseEntity<ApiError> response(
       HttpStatus status, String code, String message, Map<String, String> fields) {
-    ApiError error =
-        new ApiError(
-            Instant.now(clock), status.value(), code, message, fields, MDC.get("requestId"));
-    return ResponseEntity.status(status).body(error);
+    return ResponseEntity.status(status).body(error(status, code, message, fields));
+  }
+
+  private ApiError error(
+      HttpStatus status, String code, String message, Map<String, String> fields) {
+    return new ApiError(
+        Instant.now(clock), status.value(), code, message, fields, MDC.get("requestId"));
   }
 }

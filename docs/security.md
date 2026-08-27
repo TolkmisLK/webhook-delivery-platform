@@ -32,7 +32,8 @@
 | Unauthorized console or API access | Deployment-provided operator credentials, BCrypt verification, and a server-side HTTP-only session |
 | Login session fixation | Session identifier rotation after successful authentication |
 | Cross-site request forgery | Session-bound CSRF token required for every unsafe API request |
-| Credential or token disclosure in logs | Authentication logs contain operator identity and outcome metadata only |
+| Online password guessing | Per-remote-address and process-wide quotas run before BCrypt verification |
+| Credential or token disclosure in logs | Authentication logs contain outcome metadata only |
 
 ### Master key
 
@@ -50,7 +51,15 @@ The current release is a single-operator engineering console with native session
 
 The session cookie is HTTP-only and uses `SameSite=Lax`; set `APP_OPERATOR_COOKIE_SECURE=true` behind an HTTPS origin. Unsafe API methods also require the session-backed CSRF token returned through `GET /api/auth/csrf`. Successful login rotates the session identifier and the CSRF token. Logout invalidates the server-side security context and clears the session cookie.
 
-Native authentication does not remove the network boundary: keep the console and API behind HTTPS and restrict management endpoints to a private operations network. Login throttling and security telemetry are planned for the next v0.5 slice. Multi-user accounts, roles, teams, tenant isolation, password recovery, and external identity providers are outside v0.5.
+Native authentication does not remove the network boundary: keep the console and API behind HTTPS and restrict management endpoints to a private operations network. Multi-user accounts, roles, teams, tenant isolation, password recovery, and external identity providers are outside v0.5.
+
+### Login abuse resistance
+
+Each process permits 8 attempts per remote address and 64 attempts in total during a one-minute window. Exceeding the client quota blocks that address for five minutes; exceeding the global quota blocks the process for one minute. Rejections occur before BCrypt, return HTTP `429 login_rate_limited`, and include `Retry-After`. At most 1,024 client entries are retained; successful authentication clears that client's state but not the global quota.
+
+The policy is controlled by `APP_OPERATOR_LOGIN_CLIENT_MAX_ATTEMPTS`, `APP_OPERATOR_LOGIN_GLOBAL_MAX_ATTEMPTS`, `APP_OPERATOR_LOGIN_WINDOW`, `APP_OPERATOR_LOGIN_CLIENT_BLOCK_DURATION`, `APP_OPERATOR_LOGIN_GLOBAL_BLOCK_DURATION`, and `APP_OPERATOR_LOGIN_MAX_CLIENT_ENTRIES`. Metrics expose only `webhook_operator_authentication_total{outcome}` with `success`, `failure`, `rate_limited`, and `logout`. A useful investigation query is `sum by (outcome) (rate(webhook_operator_authentication_total[5m]))`.
+
+The limiter is intentionally in-memory and per process. It keys directly on the servlet remote address and does not trust forwarded headers. Behind a reverse proxy, all requests may therefore share the proxy address unless the deployment supplies a trusted container-level forwarding policy. Multiple replicas do not share quotas; internet-facing deployments should retain edge rate limiting. The client quota can also be abused to delay a legitimate login, so a `rate_limited` increase requires investigation rather than automatic permanent blocking.
 
 ### SSRF residual risk
 
@@ -98,7 +107,8 @@ Consumers should:
 | 未授权访问控制台或 API | 部署提供操作者凭据、使用 BCrypt 校验，并建立服务端 HTTP-only 会话 |
 | 登录会话固定攻击 | 认证成功后轮换 Session ID |
 | 跨站请求伪造 | 所有不安全方法的 API 请求必须携带会话绑定的 CSRF Token |
-| 凭据或 Token 泄露到日志 | 认证日志只记录操作者身份与结果元数据 |
+| 在线密码猜测 | 在 BCrypt 校验前执行按远端地址和单个进程计算的双层配额 |
+| 凭据或 Token 泄露到日志 | 认证日志只记录结果元数据 |
 
 `APP_SECURITY_MASTER_KEY` 是 Base64 编码的 32 字节密钥。更换密钥时需要执行受控迁移，先用旧密钥解密，再用新密钥加密已有 Endpoint 数据。
 
@@ -110,6 +120,14 @@ Endpoint 目标 URL 编辑沿用相同的观察版本，并在持久化前重新
 
 会话 Cookie 使用 HTTP-only 与 `SameSite=Lax`；在 HTTPS 入口后应设置 `APP_OPERATOR_COOKIE_SECURE=true`。不安全方法的 API 请求还必须携带 `GET /api/auth/csrf` 返回、并保存在服务端 Session 中的 CSRF Token。登录成功会轮换 Session ID 与 CSRF Token，登出会使服务端安全上下文失效并清理 Session Cookie。
 
-原生认证不能替代网络边界：控制台和 API 应位于 HTTPS 后，管理端点仍应限制在私有运维网络。登录限流与安全遥测安排在 v0.5 下一切片；多人账号、角色、团队、租户隔离、密码找回和外部身份提供方均不在 v0.5 范围内。
+原生认证不能替代网络边界：控制台和 API 应位于 HTTPS 后，管理端点仍应限制在私有运维网络。多人账号、角色、团队、租户隔离、密码找回和外部身份提供方均不在 v0.5 范围内。
+
+### 登录滥用防护
+
+每个进程在一分钟窗口内允许每个远端地址尝试 8 次、全局尝试 64 次。超过客户端配额后阻止该地址 5 分钟，超过全局配额后阻止该进程 1 分钟。拒绝发生在 BCrypt 校验之前，返回 HTTP `429 login_rate_limited` 与 `Retry-After`。进程最多保留 1,024 个客户端条目；登录成功只清除当前客户端状态，不重置全局配额。
+
+策略由 `APP_OPERATOR_LOGIN_CLIENT_MAX_ATTEMPTS`、`APP_OPERATOR_LOGIN_GLOBAL_MAX_ATTEMPTS`、`APP_OPERATOR_LOGIN_WINDOW`、`APP_OPERATOR_LOGIN_CLIENT_BLOCK_DURATION`、`APP_OPERATOR_LOGIN_GLOBAL_BLOCK_DURATION` 与 `APP_OPERATOR_LOGIN_MAX_CLIENT_ENTRIES` 控制。指标只暴露带 `success`、`failure`、`rate_limited`、`logout` 四种 `outcome` 的 `webhook_operator_authentication_total`；可用 `sum by (outcome) (rate(webhook_operator_authentication_total[5m]))` 排查变化。
+
+限流状态位于单个进程内，直接使用 Servlet 看到的远端地址，应用代码不信任转发头。位于反向代理后时，请求可能共享代理地址，除非部署在容器层配置可信转发策略；多个副本也不共享配额，因此公网入口仍应保留边缘限流。攻击者还可能利用客户端配额延迟合法登录，`rate_limited` 上升应触发人工排查，而不是自动永久封禁。
 
 Docker 演示环境使用 `APP_SECURITY_ALLOW_PRIVATE_TARGETS=true` 访问内部 Receiver；生产环境保持为 `false`，并建议通过网络出口策略或专用 Outbound Proxy 进一步控制实际连接地址。

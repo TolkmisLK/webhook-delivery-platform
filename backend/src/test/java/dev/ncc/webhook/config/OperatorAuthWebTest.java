@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import dev.ncc.webhook.common.ApiExceptionHandler;
 import dev.ncc.webhook.common.RequestIdFilter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -28,11 +30,15 @@ import tools.jackson.databind.json.JsonMapper;
     controllers = OperatorAuthController.class,
     properties = {
       "app.operator.username=test-operator",
-      "app.operator.password=test-operator-password"
+      "app.operator.password=test-operator-password",
+      "app.operator.login-limit.client-max-attempts=100",
+      "app.operator.login-limit.global-max-attempts=100"
     })
-@EnableConfigurationProperties(OperatorAccessProperties.class)
+@EnableConfigurationProperties({OperatorAccessProperties.class, OperatorLoginLimitProperties.class})
 @Import({
   OperatorSecurityConfiguration.class,
+  OperatorLoginAttemptLimiter.class,
+  OperatorAuthTelemetry.class,
   SecurityErrorWriter.class,
   ApiExceptionHandler.class,
   RequestIdFilter.class,
@@ -168,6 +174,11 @@ class OperatorAuthWebTest {
     @Bean
     Clock clock() {
       return Clock.fixed(Instant.parse("2026-08-27T00:00:00Z"), ZoneOffset.UTC);
+    }
+
+    @Bean
+    MeterRegistry meterRegistry() {
+      return new SimpleMeterRegistry();
     }
   }
 }

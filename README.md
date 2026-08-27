@@ -35,6 +35,7 @@ The first release intentionally uses a modular monolith and a PostgreSQL-backed 
 - Versioned Endpoint signing-secret rotation without exposing secret material
 - Versioned Endpoint name and target-URL editing with full safety revalidation
 - Native single-operator sessions, CSRF-protected mutations, and stable access errors
+- Bounded login throttling and fixed-cardinality authentication outcome metrics
 
 ### Quick start
 
@@ -62,7 +63,7 @@ To exercise retry recovery, register another endpoint with this URL:
 http://receiver:8090/hooks/flaky?failures=2
 ```
 
-The receiver returns HTTP `503` twice for each event and then succeeds. Use **Inspect** to review the committed attempt timeline. Runtime counters and timers are available through `/actuator/metrics/webhook.delivery.attempts` and `/actuator/metrics/webhook.delivery.duration`.
+The receiver returns HTTP `503` twice for each event and then succeeds. Use **Inspect** to review the committed attempt timeline. Runtime metrics include `/actuator/metrics/webhook.delivery.attempts`, `/actuator/metrics/webhook.delivery.duration`, and `/actuator/metrics/webhook.operator.authentication`.
 
 For a reproducible Prometheus view, start the optional observability profile:
 
@@ -70,7 +71,7 @@ For a reproducible Prometheus view, start the optional observability profile:
 docker compose --profile observability up --build
 ```
 
-Open [http://localhost:9090/targets](http://localhost:9090/targets) and query `webhook_delivery_jobs` or `webhook_delivery_oldest_runnable_age_seconds`. The Prometheus port is bound to `127.0.0.1`; the frontend proxies only health checks, not metrics. In production, keep all management endpoints on a private operations network.
+Open [http://localhost:9090/targets](http://localhost:9090/targets) and query `webhook_delivery_jobs`, `webhook_delivery_oldest_runnable_age_seconds`, or `webhook_operator_authentication_total`. The Prometheus port is bound to `127.0.0.1`; the frontend proxies only health checks, not metrics. In production, keep all management endpoints on a private operations network.
 
 ### Delivery contract
 
@@ -112,7 +113,7 @@ The backend gate also checks Google Java Format and verifies the Spring Modulith
 
 ### Current scope
 
-`v0.5` adds a native access boundary for the single-operator console. Deployment-provided credentials create a server-side session; unsafe API requests require a session-bound CSRF token, and all `/api/**` operations (including SSE) require the operator role. Multi-user accounts, roles, tenant isolation, and external identity providers remain outside this release.
+`v0.5` adds a native access boundary for the single-operator console. Deployment-provided credentials create a server-side session; unsafe API requests require a session-bound CSRF token, and all `/api/**` operations (including SSE) require the operator role. Login attempts are bounded per remote address and per process before BCrypt verification, with fixed-cardinality outcome telemetry. Multi-user accounts, distributed rate limiting, roles, tenant isolation, and external identity providers remain outside this release.
 
 ## 中文
 
@@ -144,6 +145,7 @@ Webhook Delivery Platform 是一个生产风格的全栈可靠事件投递参考
 - 不暴露密钥内容且带版本校验的 Endpoint 签名密钥轮换
 - 重新执行完整安全校验且带版本控制的 Endpoint 名称与目标地址编辑
 - 原生单操作者会话、带 CSRF 防护的写请求，以及稳定访问错误结构
+- 有界登录限流与固定基数认证结果指标
 
 ### 快速开始
 
@@ -169,7 +171,7 @@ docker compose up --build
 http://receiver:8090/hooks/flaky?failures=2
 ```
 
-Receiver 会针对每个事件先返回两次 HTTP `503`，随后成功。可通过“查看详情”审查已提交的尝试时间线；运行时计数与耗时指标可从 `/actuator/metrics/webhook.delivery.attempts` 和 `/actuator/metrics/webhook.delivery.duration` 查询。
+Receiver 会针对每个事件先返回两次 HTTP `503`，随后成功。可通过“查看详情”审查已提交的尝试时间线；运行时指标包括 `/actuator/metrics/webhook.delivery.attempts`、`/actuator/metrics/webhook.delivery.duration` 与 `/actuator/metrics/webhook.operator.authentication`。
 
 如需使用可复现的 Prometheus 视图，可启动可选的可观测性 Profile：
 
@@ -177,7 +179,7 @@ Receiver 会针对每个事件先返回两次 HTTP `503`，随后成功。可通
 docker compose --profile observability up --build
 ```
 
-访问 [http://localhost:9090/targets](http://localhost:9090/targets)，可查询 `webhook_delivery_jobs` 或 `webhook_delivery_oldest_runnable_age_seconds`。Prometheus 端口仅绑定 `127.0.0.1`，前端也只代理健康检查而不会公开指标。生产环境必须将所有管理端点限制在私有运维网络。
+访问 [http://localhost:9090/targets](http://localhost:9090/targets)，可查询 `webhook_delivery_jobs`、`webhook_delivery_oldest_runnable_age_seconds` 或 `webhook_operator_authentication_total`。Prometheus 端口仅绑定 `127.0.0.1`，前端也只代理健康检查而不会公开指标。生产环境必须将所有管理端点限制在私有运维网络。
 
 注册 Endpoint 并发布示例事件后，可以观察任务从 `PENDING` 进入 `SUCCEEDED`。
 
@@ -224,7 +226,7 @@ PostgreSQL 集成测试会启动真实目标服务，通过 API 验证幂等接�
 
 ### 当前范围
 
-`v0.5` 为单操作者控制台增加原生访问边界。部署提供的凭据会建立服务端会话；不安全方法的 API 请求必须携带与会话绑定的 CSRF Token，全部 `/api/**` 操作（包括 SSE）都要求操作者角色。多人账号、角色、租户隔离与外部身份提供方不在本版本范围内。
+`v0.5` 为单操作者控制台增加原生访问边界。部署提供的凭据会建立服务端会话；不安全方法的 API 请求必须携带与会话绑定的 CSRF Token，全部 `/api/**` 操作（包括 SSE）都要求操作者角色。系统会在 BCrypt 校验前按远端地址和单个进程限制登录尝试，并暴露固定基数结果指标。多人账号、分布式限流、角色、租户隔离与外部身份提供方不在本版本范围内。
 
 ## License
 
