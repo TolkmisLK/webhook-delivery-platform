@@ -51,7 +51,7 @@ The current release is a single-operator engineering console with native session
 
 The session cookie is HTTP-only and uses `SameSite=Lax`; set `APP_OPERATOR_COOKIE_SECURE=true` behind an HTTPS origin. Unsafe API methods also require the session-backed CSRF token returned through `GET /api/auth/csrf`. Successful login rotates the session identifier and the CSRF token. Logout invalidates the server-side security context and clears the session cookie.
 
-Native authentication does not remove the network boundary: keep the console and API behind HTTPS and restrict management endpoints to a private operations network. Multi-user accounts, roles, teams, tenant isolation, password recovery, and external identity providers are outside v0.5.
+Native authentication does not remove the network boundary: keep the console and API behind HTTPS and restrict management endpoints to a private operations network. Multi-user accounts, roles, teams, tenant isolation, password recovery, and external identity providers are outside v1.0.
 
 ### Login abuse resistance
 
@@ -120,7 +120,7 @@ Endpoint 目标 URL 编辑沿用相同的观察版本，并在持久化前重新
 
 会话 Cookie 使用 HTTP-only 与 `SameSite=Lax`；在 HTTPS 入口后应设置 `APP_OPERATOR_COOKIE_SECURE=true`。不安全方法的 API 请求还必须携带 `GET /api/auth/csrf` 返回、并保存在服务端 Session 中的 CSRF Token。登录成功会轮换 Session ID 与 CSRF Token，登出会使服务端安全上下文失效并清理 Session Cookie。
 
-原生认证不能替代网络边界：控制台和 API 应位于 HTTPS 后，管理端点仍应限制在私有运维网络。多人账号、角色、团队、租户隔离、密码找回和外部身份提供方均不在 v0.5 范围内。
+原生认证不能替代网络边界：控制台和 API 应位于 HTTPS 后，管理端点仍应限制在私有运维网络。多人账号、角色、团队、租户隔离、密码找回和外部身份提供方均不在 v1.0 范围内。
 
 ### 登录滥用防护
 

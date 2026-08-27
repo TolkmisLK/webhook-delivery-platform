@@ -56,6 +56,7 @@ class WebhookFlowIT {
   private static final AtomicInteger ROTATION_NEW_SECRET_COUNT = new AtomicInteger();
   private static final AtomicInteger CONFIG_ORIGINAL_COUNT = new AtomicInteger();
   private static final AtomicInteger CONFIG_UPDATED_COUNT = new AtomicInteger();
+  private static final AtomicInteger RECLAIMED_COUNT = new AtomicInteger();
   private static final HttpServer TARGET = startTarget();
 
   @Container
@@ -773,6 +774,67 @@ class WebhookFlowIT {
         .andExpect(status().isNotFound());
   }
 
+  @Test
+  void reclaimsAnExpiredProcessingLeaseWithoutChangingTheDeliverySnapshot() throws Exception {
+    RECLAIMED_COUNT.set(0);
+    String endpointJson =
+        mockMvc
+            .perform(
+                post("/api/endpoints")
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {
+                          "name": "reclaimed integration target",
+                          "url": "http://127.0.0.1:%d/hooks/reclaimed",
+                          "secret": "integration-secret"
+                        }
+                        """
+                            .formatted(TARGET.getAddress().getPort())))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    UUID endpointId = UUID.fromString(jsonMapper.readTree(endpointJson).get("id").asText());
+    UUID deliveryId = insertDelivery(endpointId, "PROCESSING", Instant.now());
+    String originalTarget =
+        jdbcTemplate.queryForObject(
+            "select target_url from delivery_job where id = ?", String.class, deliveryId);
+    String originalEncryptedSecret =
+        jdbcTemplate.queryForObject(
+            "select encrypted_secret from delivery_job where id = ?", String.class, deliveryId);
+
+    jdbcTemplate.update(
+        "update delivery_job set locked_at = ?, locked_by = 'retired-worker' where id = ?",
+        Timestamp.from(Instant.now().minusSeconds(60)),
+        deliveryId);
+
+    awaitSuccess(deliveryId);
+
+    assertThat(RECLAIMED_COUNT.get()).isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select target_url from delivery_job where id = ?", String.class, deliveryId))
+        .isEqualTo(originalTarget);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select encrypted_secret from delivery_job where id = ?",
+                String.class,
+                deliveryId))
+        .isEqualTo(originalEncryptedSecret);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from delivery_attempt where job_id = ?", Long.class,
+                deliveryId))
+        .isEqualTo(1L);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from delivery_job where id = ? and locked_at is null and locked_by is null",
+                Long.class,
+                deliveryId))
+        .isEqualTo(1L);
+  }
+
   private void awaitSuccess(UUID deliveryId) throws InterruptedException {
     long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
     while (System.nanoTime() < deadline) {
@@ -832,6 +894,8 @@ class WebhookFlowIT {
       server.createContext("/hooks", exchange -> handleTarget(exchange, false, false));
       server.createContext("/hooks/flaky", exchange -> handleTarget(exchange, true, false));
       server.createContext("/hooks/cancel", exchange -> handleTarget(exchange, false, true));
+      server.createContext(
+          "/hooks/reclaimed", exchange -> handleSnapshotTarget(exchange, RECLAIMED_COUNT));
       server.createContext(
           "/hooks/snapshot-original",
           exchange -> handleSnapshotTarget(exchange, SNAPSHOT_ORIGINAL_COUNT));
