@@ -159,7 +159,7 @@ class OperatorAuthWebTest {
     mockMvc
         .perform(get("/api/auth/csrf"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.headerName").value("X-XSRF-TOKEN"))
+        .andExpect(jsonPath("$.headerName").value("X-CSRF-TOKEN"))
         .andExpect(jsonPath("$.token").isNotEmpty());
   }
 

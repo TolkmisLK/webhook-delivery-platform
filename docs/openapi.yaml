@@ -317,7 +317,7 @@ components:
       name: JSESSIONID
   parameters:
     CsrfHeader:
-      name: X-XSRF-TOKEN
+      name: X-CSRF-TOKEN
       in: header
       required: true
       description: Session-bound token obtained from `GET /api/auth/csrf`.
@@ -406,7 +406,7 @@ components:
       properties:
         headerName:
           type: string
-          example: X-XSRF-TOKEN
+          example: X-CSRF-TOKEN
         token:
           type: string
     CreateEndpoint:

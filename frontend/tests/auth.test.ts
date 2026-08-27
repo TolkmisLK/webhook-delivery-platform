@@ -12,7 +12,7 @@ describe("operator session access", () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ headerName: "X-XSRF-TOKEN", token: "before-login" }),
+        json: async () => ({ headerName: "X-CSRF-TOKEN", token: "before-login" }),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -21,7 +21,7 @@ describe("operator session access", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ headerName: "X-XSRF-TOKEN", token: "after-login" }),
+        json: async () => ({ headerName: "X-CSRF-TOKEN", token: "after-login" }),
       });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -33,7 +33,7 @@ describe("operator session access", () => {
     });
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/auth/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": "before-login" },
+      headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": "before-login" },
       body: JSON.stringify({ username: "admin", password: "local-admin-password" }),
     });
     expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/auth/csrf", {

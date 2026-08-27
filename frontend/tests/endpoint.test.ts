@@ -61,7 +61,7 @@ describe("endpoint secret rotation", () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ headerName: "X-XSRF-TOKEN", token: "csrf-token" }),
+        json: async () => ({ headerName: "X-CSRF-TOKEN", token: "csrf-token" }),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -78,7 +78,7 @@ describe("endpoint secret rotation", () => {
     });
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/endpoints/active-1/secret", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": "csrf-token" },
+      headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": "csrf-token" },
       body: JSON.stringify({ newSecret: "replacement-secret", expectedVersion: 2 }),
     });
     expect(rotated).not.toHaveProperty("secret");
@@ -97,7 +97,7 @@ describe("endpoint configuration editing", () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ headerName: "X-XSRF-TOKEN", token: "csrf-token" }),
+        json: async () => ({ headerName: "X-CSRF-TOKEN", token: "csrf-token" }),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -111,7 +111,7 @@ describe("endpoint configuration editing", () => {
     ).resolves.toEqual(updated);
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/endpoints/active-1", {
       method: "PUT",
-      headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": "csrf-token" },
+      headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": "csrf-token" },
       body: JSON.stringify({
         name: "Updated receiver",
         url: "https://example.com/updated",
