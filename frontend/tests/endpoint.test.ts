@@ -31,6 +31,7 @@ const endpoints: Endpoint[] = [
 ];
 
 afterEach(() => {
+  api.resetSessionState();
   vi.unstubAllGlobals();
 });
 
@@ -56,18 +57,28 @@ describe("selectActiveEndpoint", () => {
 describe("endpoint secret rotation", () => {
   it("sends the new secret only in the write request", async () => {
     const rotated = { ...endpoints[0], version: 3 };
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => rotated,
-    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ headerName: "X-XSRF-TOKEN", token: "csrf-token" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => rotated,
+      });
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(api.rotateEndpointSecret("active-1", "replacement-secret", 2)).resolves.toEqual(
       rotated,
     );
-    expect(fetchMock).toHaveBeenCalledWith("/api/endpoints/active-1/secret", {
-      method: "PATCH",
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/auth/csrf", {
       headers: { "Content-Type": "application/json" },
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/endpoints/active-1/secret", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": "csrf-token" },
       body: JSON.stringify({ newSecret: "replacement-secret", expectedVersion: 2 }),
     });
     expect(rotated).not.toHaveProperty("secret");
@@ -82,18 +93,25 @@ describe("endpoint configuration editing", () => {
       url: "https://example.com/updated",
       version: 3,
     };
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => updated,
-    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ headerName: "X-XSRF-TOKEN", token: "csrf-token" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => updated,
+      });
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
       api.updateEndpoint("active-1", "Updated receiver", "https://example.com/updated", 2),
     ).resolves.toEqual(updated);
-    expect(fetchMock).toHaveBeenCalledWith("/api/endpoints/active-1", {
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/endpoints/active-1", {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": "csrf-token" },
       body: JSON.stringify({
         name: "Updated receiver",
         url: "https://example.com/updated",

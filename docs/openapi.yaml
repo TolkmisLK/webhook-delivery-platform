@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Webhook Delivery Platform API
-  version: 0.4.0
+  version: 0.5.0
   license:
     name: MIT
     identifier: MIT
@@ -10,8 +10,71 @@ info:
     持久化 Webhook Endpoint、事件与投递任务 API。
 servers:
   - url: /
-security: []
+security:
+  - cookieAuth: []
 paths:
+  /api/auth/csrf:
+    get:
+      operationId: getCsrfToken
+      summary: Obtain CSRF metadata / 获取 CSRF 元数据
+      security: []
+      responses:
+        "200":
+          description: The current session-bound CSRF token and required request header.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CsrfMetadata"
+  /api/auth/login:
+    post:
+      operationId: loginOperator
+      summary: Start an operator session / 创建操作者会话
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Credentials accepted and the session identifier rotated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperatorSession"
+        "401":
+          $ref: "#/components/responses/InvalidCredentials"
+        "403":
+          $ref: "#/components/responses/AccessDenied"
+  /api/auth/session:
+    get:
+      operationId: getOperatorSession
+      summary: Inspect the current operator session / 查询当前操作者会话
+      responses:
+        "200":
+          description: Authenticated operator identity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperatorSession"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+  /api/auth/logout:
+    post:
+      operationId: logoutOperator
+      summary: End the operator session / 结束操作者会话
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
+      responses:
+        "204":
+          description: Session invalidated and authentication cookies cleared.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/AccessDenied"
   /api/endpoints:
     get:
       operationId: listEndpoints
@@ -28,6 +91,8 @@ paths:
     post:
       operationId: createEndpoint
       summary: Register an endpoint / 注册 Endpoint
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
       requestBody:
         required: true
         content:
@@ -52,6 +117,7 @@ paths:
         Deliveries accepted before this update retain their immutable target snapshot.
       parameters:
         - $ref: "#/components/parameters/EndpointId"
+        - $ref: "#/components/parameters/CsrfHeader"
       requestBody:
         required: true
         content:
@@ -77,6 +143,7 @@ paths:
       summary: Activate or deactivate an endpoint / 启用或停用 Endpoint
       parameters:
         - $ref: "#/components/parameters/EndpointId"
+        - $ref: "#/components/parameters/CsrfHeader"
       requestBody:
         required: true
         content:
@@ -105,6 +172,7 @@ paths:
         Deliveries accepted before rotation retain their immutable secret snapshot.
       parameters:
         - $ref: "#/components/parameters/EndpointId"
+        - $ref: "#/components/parameters/CsrfHeader"
       requestBody:
         required: true
         content:
@@ -128,6 +196,8 @@ paths:
     post:
       operationId: publishEvent
       summary: Accept an event / 接收事件
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
       requestBody:
         required: true
         content:
@@ -198,6 +268,7 @@ paths:
       summary: Queue a delivery for replay / 重新投递
       parameters:
         - $ref: "#/components/parameters/DeliveryId"
+        - $ref: "#/components/parameters/CsrfHeader"
       responses:
         "200":
           description: Delivery returned to PENDING with an extended attempt budget.
@@ -215,6 +286,7 @@ paths:
       summary: Cancel queued delivery work / 取消排队中的推送任务
       parameters:
         - $ref: "#/components/parameters/DeliveryId"
+        - $ref: "#/components/parameters/CsrfHeader"
       responses:
         "200":
           description: Delivery is CANCELED; repeating the request is idempotent.
@@ -238,7 +310,19 @@ paths:
               schema:
                 type: string
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: JSESSIONID
   parameters:
+    CsrfHeader:
+      name: X-XSRF-TOKEN
+      in: header
+      required: true
+      description: Session-bound token obtained from `GET /api/auth/csrf`.
+      schema:
+        type: string
     EndpointId:
       name: endpointId
       in: path
@@ -254,6 +338,24 @@ components:
         type: string
         format: uuid
   responses:
+    Unauthenticated:
+      description: No valid operator session. Error code is `unauthenticated`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    InvalidCredentials:
+      description: The supplied credentials are invalid. Error code is `invalid_credentials`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    AccessDenied:
+      description: CSRF validation or authorization failed. Error code is `access_denied`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
     BadRequest:
       description: Invalid request.
       content:
@@ -279,6 +381,34 @@ components:
           schema:
             $ref: "#/components/schemas/ApiError"
   schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 120
+        password:
+          type: string
+          minLength: 1
+          maxLength: 512
+          writeOnly: true
+    OperatorSession:
+      type: object
+      required: [username]
+      properties:
+        username:
+          type: string
+    CsrfMetadata:
+      type: object
+      required: [headerName, token]
+      properties:
+        headerName:
+          type: string
+          example: X-XSRF-TOKEN
+        token:
+          type: string
     CreateEndpoint:
       type: object
       required: [name, url, secret]

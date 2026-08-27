@@ -42,6 +42,15 @@ public class ApiExceptionHandler {
         HttpStatus.CONFLICT, "delivery_state_conflict", exception.getMessage(), Map.of());
   }
 
+  @ExceptionHandler(InvalidCredentialsException.class)
+  ResponseEntity<ApiError> handleInvalidCredentials() {
+    return response(
+        HttpStatus.UNAUTHORIZED,
+        "invalid_credentials",
+        "Username or password is incorrect",
+        Map.of());
+  }
+
   @ExceptionHandler(IllegalArgumentException.class)
   ResponseEntity<ApiError> handleBadRequest(IllegalArgumentException exception) {
     return response(HttpStatus.BAD_REQUEST, "invalid_request", exception.getMessage(), Map.of());

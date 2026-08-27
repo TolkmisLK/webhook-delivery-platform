@@ -18,6 +18,13 @@ spring:
 
 server:
   shutdown: graceful
+  servlet:
+    session:
+      timeout: ${APP_OPERATOR_SESSION_TIMEOUT:30m}
+      cookie:
+        http-only: true
+        same-site: lax
+        secure: ${APP_OPERATOR_COOKIE_SECURE:false}
 
 management:
   endpoints:
@@ -30,6 +37,9 @@ management:
         enabled: true
 
 app:
+  operator:
+    username: ${APP_OPERATOR_USERNAME:}
+    password: ${APP_OPERATOR_PASSWORD:}
   delivery:
     poll-interval: ${APP_DELIVERY_POLL_INTERVAL:1s}
     request-timeout: ${APP_DELIVERY_REQUEST_TIMEOUT:5s}

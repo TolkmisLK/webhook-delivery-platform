@@ -42,7 +42,7 @@ import tools.jackson.databind.json.JsonMapper;
 @SpringBootTest
 // Close scheduled workers before Testcontainers stops PostgreSQL.
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 class WebhookFlowIT {
 
   private static final AtomicReference<String> RECEIVED_BODY = new AtomicReference<>();
@@ -73,6 +73,8 @@ class WebhookFlowIT {
                 .encodeToString(
                     "0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.UTF_8)));
     registry.add("app.security.allow-private-targets", () -> "true");
+    registry.add("app.operator.username", () -> "integration-operator");
+    registry.add("app.operator.password", () -> "integration-operator-password");
     registry.add(
         "app.security.allowed-ports", () -> Integer.toString(TARGET.getAddress().getPort()));
     registry.add("app.delivery.poll-interval", () -> "100ms");

@@ -11,6 +11,7 @@
 - Delivery history and error context
 - Internal network reachability
 - Worker availability
+- Operator session and administrative API access
 
 ### Controls
 
@@ -28,6 +29,10 @@
 | Timing attack in receiver | Included receiver uses constant-time signature comparison |
 | Worker crash | Expired database leases are reclaimable |
 | Duplicate processing | Stable event ID and documented at-least-once contract |
+| Unauthorized console or API access | Deployment-provided operator credentials, BCrypt verification, and a server-side HTTP-only session |
+| Login session fixation | Session identifier rotation after successful authentication |
+| Cross-site request forgery | Session-bound CSRF token required for every unsafe API request |
+| Credential or token disclosure in logs | Authentication logs contain operator identity and outcome metadata only |
 
 ### Master key
 
@@ -41,7 +46,11 @@ Endpoint target-URL edits require the same observed version and re-run the compl
 
 ### Deployment boundary
 
-The current release is a single-operator engineering console. Deploy it behind an authenticated reverse proxy or a private network boundary. Native account and authorization policy are planned before any shared deployment.
+The current release is a single-operator engineering console with native session authentication. Set `APP_OPERATOR_USERNAME` and a unique `APP_OPERATOR_PASSWORD` of at least 16 characters through the deployment secret store. The password is verified through BCrypt and is never persisted by the application.
+
+The session cookie is HTTP-only and uses `SameSite=Lax`; set `APP_OPERATOR_COOKIE_SECURE=true` behind an HTTPS origin. Unsafe API methods also require the session-backed CSRF token returned through `GET /api/auth/csrf`. Successful login rotates the session identifier and the CSRF token. Logout invalidates the server-side security context and clears the session cookie.
+
+Native authentication does not remove the network boundary: keep the console and API behind HTTPS and restrict management endpoints to a private operations network. Login throttling and security telemetry are planned for the next v0.5 slice. Multi-user accounts, roles, teams, tenant isolation, password recovery, and external identity providers are outside v0.5.
 
 ### SSRF residual risk
 
@@ -68,6 +77,7 @@ Consumers should:
 - 投递历史和错误上下文
 - 内部网络访问能力
 - Worker 可用性
+- 操作者会话与管理 API 访问权限
 
 ### 安全控制
 
@@ -85,6 +95,10 @@ Consumers should:
 | 接收方时序攻击 | Demo Receiver 使用常量时间比较 |
 | Worker 异常退出 | 数据库租约过期后可以重新抢占 |
 | 重复处理 | 稳定事件 ID 与明确的 at-least-once 契约 |
+| 未授权访问控制台或 API | 部署提供操作者凭据、使用 BCrypt 校验，并建立服务端 HTTP-only 会话 |
+| 登录会话固定攻击 | 认证成功后轮换 Session ID |
+| 跨站请求伪造 | 所有不安全方法的 API 请求必须携带会话绑定的 CSRF Token |
+| 凭据或 Token 泄露到日志 | 认证日志只记录操作者身份与结果元数据 |
 
 `APP_SECURITY_MASTER_KEY` 是 Base64 编码的 32 字节密钥。更换密钥时需要执行受控迁移，先用旧密钥解密，再用新密钥加密已有 Endpoint 数据。
 
@@ -92,6 +106,10 @@ Endpoint 签名密钥轮换必须携带运维端最后观察到的版本。陈�
 
 Endpoint 目标 URL 编辑沿用相同的观察版本，并在持久化前重新执行完整 URL 安全策略。成功后的审计事件只包含变更标记，不包含新旧 URL；已接收任务保留原目标快照，因此编辑操作无法重定向排队或重试中的任务。
 
-当前版本是单操作者工程控制台。部署时应放在带认证的反向代理或私有网络边界之后；在支持多人共享部署前，将增加系统自身的账号与授权策略。
+当前版本是带原生会话认证的单操作者工程控制台。通过部署密钥管理设置 `APP_OPERATOR_USERNAME` 和至少 16 字符的唯一 `APP_OPERATOR_PASSWORD`；应用使用 BCrypt 校验密码，且不持久化密码。
+
+会话 Cookie 使用 HTTP-only 与 `SameSite=Lax`；在 HTTPS 入口后应设置 `APP_OPERATOR_COOKIE_SECURE=true`。不安全方法的 API 请求还必须携带 `GET /api/auth/csrf` 返回、并保存在服务端 Session 中的 CSRF Token。登录成功会轮换 Session ID 与 CSRF Token，登出会使服务端安全上下文失效并清理 Session Cookie。
+
+原生认证不能替代网络边界：控制台和 API 应位于 HTTPS 后，管理端点仍应限制在私有运维网络。登录限流与安全遥测安排在 v0.5 下一切片；多人账号、角色、团队、租户隔离、密码找回和外部身份提供方均不在 v0.5 范围内。
 
 Docker 演示环境使用 `APP_SECURITY_ALLOW_PRIVATE_TARGETS=true` 访问内部 Receiver；生产环境保持为 `false`，并建议通过网络出口策略或专用 Outbound Proxy 进一步控制实际连接地址。

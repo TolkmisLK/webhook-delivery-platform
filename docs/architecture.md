@@ -8,11 +8,12 @@
 
 ```mermaid
 flowchart LR
-    P["Event producer"] --> API["Spring Boot API"]
+    O["Operator"] --> UI["React console"]
+    UI --> API["Session-protected API"]
+    P["Event producer"] --> API
     API --> DB[(PostgreSQL)]
     DB --> W["Delivery worker"]
     W --> T["Webhook target"]
-    API --> UI["React console"]
 ```
 
 The application is a modular monolith with one deployable backend and one static frontend. PostgreSQL owns the durable state transition. Network I/O happens outside database transactions.
@@ -24,10 +25,20 @@ The application is a modular monolith with one deployable backend and one static
 | `endpoint` | Endpoint registration, versioned activation, URL policy, encrypted signing secret |
 | `event` | Idempotent event acceptance and deterministic request body |
 | `delivery` | Job lease, HTTP execution, retry policy, attempts, replay, SSE |
-| `config` | Typed configuration, AES-GCM, HTTP client, clock |
+| `config` | Typed configuration, AES-GCM, HTTP client, clock, operator authentication |
 | `common` | Request correlation and stable API error responses |
 
 The `event` module calls the `DeliverySubmission` port that it owns; the `delivery` module provides the implementation. This keeps event acceptance independent from delivery internals and removes a package cycle. A Spring Modulith test verifies the dependency graph during every backend build.
+
+### Operator access flow
+
+1. The frontend obtains CSRF metadata from the public `GET /api/auth/csrf` bootstrap endpoint.
+2. `POST /api/auth/login` verifies the deployment-provided operator credentials through BCrypt.
+3. Successful authentication rotates the session identifier, stores the security context server-side, and rotates the CSRF token.
+4. Every other `/api/**` route, including the delivery SSE stream, requires the operator role. Unsafe methods additionally require the current CSRF token.
+5. `POST /api/auth/logout` invalidates the security context, clears the server-side CSRF state, and expires the session cookie.
+
+The frontend bundle and readiness endpoint remain publicly reachable so the sign-in screen and platform probes can load. Management endpoints retain the existing private-network deployment boundary.
 
 ### Acceptance flow
 
@@ -113,10 +124,20 @@ The demo receiver exposes `/hooks/flaky?failures=N` for a bounded, deterministic
 | `endpoint` | Endpoint 注册、带版本的启停控制、URL 策略和加密签名密钥 |
 | `event` | 幂等事件接收与确定性请求体生成 |
 | `delivery` | 任务租约、HTTP 投递、重试、尝试记录、重投和 SSE |
-| `config` | 类型化配置、AES-GCM、HTTP Client 与时间源 |
+| `config` | 类型化配置、AES-GCM、HTTP Client、时间源与操作者认证 |
 | `common` | 请求关联 ID 和稳定 API 错误结构 |
 
 `event` 模块调用自身定义的 `DeliverySubmission` 端口，`delivery` 模块提供实现。这样事件接收不依赖投递内部实现，也避免了包级循环依赖；每次后端构建都会通过 Spring Modulith 测试验证依赖图。
+
+### 操作者访问流程
+
+1. 前端先从公开的 `GET /api/auth/csrf` 启动端点获取 CSRF 元数据。
+2. `POST /api/auth/login` 使用 BCrypt 校验部署提供的操作者凭据。
+3. 认证成功后轮换 Session ID，将安全上下文存入服务端，并轮换 CSRF Token。
+4. 其余全部 `/api/**` 路由（包括投递 SSE）都要求操作者角色；不安全方法还必须携带当前 CSRF Token。
+5. `POST /api/auth/logout` 使安全上下文失效、清理服务端 CSRF 状态，并让 Session Cookie 过期。
+
+前端静态文件与就绪探针保持公开，以便登录页面和平台健康检查正常加载；管理端点继续沿用现有私有网络部署边界。
 
 ### 事件接收流程
 

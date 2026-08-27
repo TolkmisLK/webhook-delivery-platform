@@ -53,7 +53,17 @@ export interface DeliveryDetail {
 }
 
 export interface ApiError {
+  code?: string;
   message?: string;
   fields?: Record<string, string>;
   requestId?: string;
+}
+
+export interface OperatorSession {
+  username: string;
+}
+
+export interface CsrfMetadata {
+  headerName: string;
+  token: string;
 }
