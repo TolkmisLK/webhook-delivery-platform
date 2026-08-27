@@ -82,9 +82,7 @@ public class OperatorAuthController {
 
   @PostMapping("/logout")
   ResponseEntity<Void> logout(
-      Authentication authentication,
-      HttpServletRequest request,
-      HttpServletResponse response) {
+      Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
     String username = authentication.getName();
     logoutHandler.logout(request, response, authentication);
     logger.info("operator_logout_succeeded username={}", username);
@@ -92,8 +90,7 @@ public class OperatorAuthController {
   }
 
   public record LoginRequest(
-      @NotBlank @Size(max = 120) String username,
-      @NotBlank @Size(max = 512) String password) {}
+      @NotBlank @Size(max = 120) String username, @NotBlank @Size(max = 512) String password) {}
 
   public record SessionResponse(String username) {}
 

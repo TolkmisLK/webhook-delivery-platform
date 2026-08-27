@@ -40,8 +40,7 @@ public class OperatorSecurityConfiguration {
       CsrfTokenRepository csrfTokenRepository,
       SecurityErrorWriter errors)
       throws Exception {
-    http.securityContext(
-            context -> context.securityContextRepository(securityContextRepository))
+    http.securityContext(context -> context.securityContextRepository(securityContextRepository))
         .csrf(csrf -> csrf.csrfTokenRepository(csrfTokenRepository))
         .authorizeHttpRequests(
             requests ->

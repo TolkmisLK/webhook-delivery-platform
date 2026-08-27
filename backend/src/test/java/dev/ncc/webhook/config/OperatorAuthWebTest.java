@@ -101,8 +101,7 @@ class OperatorAuthWebTest {
   @Test
   void createsRotatedSessionAndInvalidatesItOnLogout() throws Exception {
     var csrfResult = mockMvc.perform(get("/api/auth/csrf")).andExpect(status().isOk()).andReturn();
-    MockHttpSession anonymousSession =
-        (MockHttpSession) csrfResult.getRequest().getSession(false);
+    MockHttpSession anonymousSession = (MockHttpSession) csrfResult.getRequest().getSession(false);
     var anonymousCsrf = jsonMapper.readTree(csrfResult.getResponse().getContentAsString());
     String previousSessionId = anonymousSession.getId();
 
