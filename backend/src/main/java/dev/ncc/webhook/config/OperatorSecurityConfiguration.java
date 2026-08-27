@@ -106,7 +106,9 @@ public class OperatorSecurityConfiguration {
 
   @Bean
   CsrfTokenRepository operatorCsrfTokenRepository() {
-    return new HttpSessionCsrfTokenRepository();
+    var repository = new HttpSessionCsrfTokenRepository();
+    repository.setHeaderName("X-XSRF-TOKEN");
+    return repository;
   }
 
   @Bean
