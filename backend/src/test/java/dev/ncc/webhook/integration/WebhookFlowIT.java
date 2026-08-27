@@ -818,14 +818,11 @@ class WebhookFlowIT {
         .isEqualTo(originalTarget);
     assertThat(
             jdbcTemplate.queryForObject(
-                "select encrypted_secret from delivery_job where id = ?",
-                String.class,
-                deliveryId))
+                "select encrypted_secret from delivery_job where id = ?", String.class, deliveryId))
         .isEqualTo(originalEncryptedSecret);
     assertThat(
             jdbcTemplate.queryForObject(
-                "select count(*) from delivery_attempt where job_id = ?", Long.class,
-                deliveryId))
+                "select count(*) from delivery_attempt where job_id = ?", Long.class, deliveryId))
         .isEqualTo(1L);
     assertThat(
             jdbcTemplate.queryForObject(
