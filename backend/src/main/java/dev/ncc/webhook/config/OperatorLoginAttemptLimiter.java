@@ -43,18 +43,12 @@ public class OperatorLoginAttemptLimiter {
 
     Decision globalDecision =
         increment(
-            global,
-            properties.getGlobalMaxAttempts(),
-            properties.getGlobalBlockDuration(),
-            now);
+            global, properties.getGlobalMaxAttempts(), properties.getGlobalBlockDuration(), now);
     if (!globalDecision.allowed()) {
       return globalDecision;
     }
     return increment(
-        client,
-        properties.getClientMaxAttempts(),
-        properties.getClientBlockDuration(),
-        now);
+        client, properties.getClientMaxAttempts(), properties.getClientBlockDuration(), now);
   }
 
   synchronized void clearClient(String remoteAddress) {
