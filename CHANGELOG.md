@@ -12,6 +12,9 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 - Published the bilingual 1.x HTTP API compatibility and deprecation policy.
 - Completed protected-operation access errors, request-correlation semantics, and delivery SSE documentation in OpenAPI.
 - Published a bilingual upgrade, PostgreSQL backup/restore, strict rollback, and recovery-verification runbook.
+- Published the bilingual v1.0 security/reliability evidence matrix, residual-risk register, and production checklist.
+- Added PostgreSQL integration coverage for reclaiming expired worker leases without changing delivery snapshots.
+- Added regression coverage that rejects encrypted endpoint secrets when the deployment master key is wrong.
 
 ## [0.5.0] - 2026-08-27
 
