@@ -75,10 +75,7 @@ class OperatorAuthWebTest {
 
     String responseId = result.getResponse().getHeader(RequestIdFilter.HEADER);
     String errorId =
-        jsonMapper
-            .readTree(result.getResponse().getContentAsString())
-            .get("requestId")
-            .asText();
+        jsonMapper.readTree(result.getResponse().getContentAsString()).get("requestId").asText();
 
     assertThat(responseId)
         .matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
