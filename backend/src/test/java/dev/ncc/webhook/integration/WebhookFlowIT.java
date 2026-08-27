@@ -47,6 +47,7 @@ class WebhookFlowIT {
 
   private static final AtomicReference<String> RECEIVED_BODY = new AtomicReference<>();
   private static final AtomicReference<String> RECEIVED_SIGNATURE = new AtomicReference<>();
+  private static final AtomicReference<String> RECEIVED_USER_AGENT = new AtomicReference<>();
   private static final AtomicInteger RECEIVED_COUNT = new AtomicInteger();
   private static final AtomicInteger FLAKY_COUNT = new AtomicInteger();
   private static final AtomicInteger CANCELED_TARGET_COUNT = new AtomicInteger();
@@ -172,6 +173,7 @@ class WebhookFlowIT {
         .isEqualTo(deliveryId.toString());
     assertThat(RECEIVED_BODY.get()).contains("demo.completed").contains("\"result\":\"ok\"");
     assertThat(RECEIVED_SIGNATURE.get()).startsWith("v1=");
+    assertThat(RECEIVED_USER_AGENT.get()).isEqualTo("NCC-Webhook-Delivery/1.0.0");
     assertThat(RECEIVED_COUNT.get()).isEqualTo(1);
 
     String detailJson =
@@ -921,6 +923,7 @@ class WebhookFlowIT {
     String expected = new HmacSigner().sign("integration-secret", Long.parseLong(timestamp), body);
     RECEIVED_BODY.set(body);
     RECEIVED_SIGNATURE.set(supplied);
+    RECEIVED_USER_AGENT.set(exchange.getRequestHeaders().getFirst("User-Agent"));
 
     int statusCode;
     if (!expected.equals(supplied)) {
