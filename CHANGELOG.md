@@ -6,6 +6,8 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-27
+
 ### Added / 新增
 
 - Native single-operator session authentication with deployment-provided credentials.
