@@ -6,6 +6,8 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-27
+
 ### Added / 新增
 
 - Race-safe, idempotent cancellation for queued delivery jobs with a stable conflict response.
