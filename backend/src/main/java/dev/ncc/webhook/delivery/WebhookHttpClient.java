@@ -34,7 +34,7 @@ class WebhookHttpClient {
         HttpRequest.newBuilder(URI.create(context.endpointUrl()))
             .timeout(properties.getRequestTimeout())
             .header("Content-Type", "application/json")
-            .header("User-Agent", "NCC-Webhook-Delivery/0.2")
+            .header("User-Agent", "NCC-Webhook-Delivery/1.0.0")
             .header("X-Webhook-Id", context.eventId().toString())
             .header("X-Webhook-Type", context.eventType())
             .header("X-Webhook-Timestamp", Long.toString(timestamp))
