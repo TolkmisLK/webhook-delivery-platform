@@ -33,7 +33,7 @@ The `event` module calls the `DeliverySubmission` port that it owns; the `delive
 ### Operator access flow
 
 1. The frontend obtains CSRF metadata from the public `GET /api/auth/csrf` bootstrap endpoint.
-2. `POST /api/auth/login` verifies the deployment-provided operator credentials through BCrypt.
+2. `POST /api/auth/login` consumes bounded client and process quotas before verifying the deployment-provided credentials through BCrypt.
 3. Successful authentication rotates the session identifier, stores the security context server-side, and rotates the CSRF token.
 4. Every other `/api/**` route, including the delivery SSE stream, requires the operator role. Unsafe methods additionally require the current CSRF token.
 5. `POST /api/auth/logout` invalidates the security context, clears the server-side CSRF state, and expires the session cookie.
@@ -93,6 +93,8 @@ Every durable delivery-state transition also publishes a bounded internal event 
 
 Queue-health metrics use a periodically refreshed immutable snapshot rather than querying PostgreSQL for every Prometheus scrape. A grouped status query supplies the fixed `status` series, while the oldest-runnable age includes both due queued jobs and expired worker leases. Metric tags are deliberately limited to lifecycle status and attempt outcome; Endpoint IDs, delivery IDs, event types, URLs, payloads, and idempotency keys are excluded. The Compose observability profile binds Prometheus to localhost, and production management endpoints belong on a private operations network.
 
+Authentication telemetry pre-registers exactly four `outcome` series: `success`, `failure`, `rate_limited`, and `logout`. The in-memory login limiter keeps an access-ordered, bounded client map plus one process-wide window; it records no username, address, cookie, CSRF value, or session identifier in metrics or logs.
+
 The demo receiver exposes `/hooks/flaky?failures=N` for a bounded, deterministic transient-failure scenario. It verifies the signature before injecting HTTP `503` responses and succeeds after the configured failure budget, allowing the same retry path to be inspected without an external service.
 
 ### Consistency decisions
@@ -132,7 +134,7 @@ The demo receiver exposes `/hooks/flaky?failures=N` for a bounded, deterministic
 ### 操作者访问流程
 
 1. 前端先从公开的 `GET /api/auth/csrf` 启动端点获取 CSRF 元数据。
-2. `POST /api/auth/login` 使用 BCrypt 校验部署提供的操作者凭据。
+2. `POST /api/auth/login` 先消耗有界的客户端与进程配额，再使用 BCrypt 校验部署提供的操作者凭据。
 3. 认证成功后轮换 Session ID，将安全上下文存入服务端，并轮换 CSRF Token。
 4. 其余全部 `/api/**` 路由（包括投递 SSE）都要求操作者角色；不安全方法还必须携带当前 CSRF Token。
 5. `POST /api/auth/logout` 使安全上下文失效、清理服务端 CSRF 状态，并让 Session Cookie 过期。
@@ -177,6 +179,8 @@ Worker 使用 `FOR UPDATE SKIP LOCKED` 抢占到期任务。事务只负责将�
 每次持久化任务状态转换还会发布一个有界内部事件，只包含任务 ID、前一状态、目标状态和固定来源。SSE 通知以及人工重投/取消审计日志通过 `AFTER_COMMIT` Listener 消费这些事件。因此，SSE 触发的客户端刷新只能观察到已提交状态，回滚转换既不会形成操作审计记录，也不会产生虚假的界面更新。
 
 队列健康指标使用定期刷新的不可变快照，而不是在每次 Prometheus 抓取时查询 PostgreSQL。分组状态查询生成固定的 `status` 序列，最老可运行任务年龄同时覆盖已到期排队任务与已过期 Worker 租约。指标标签只允许生命周期状态和尝试结果，明确排除 Endpoint ID、投递 ID、事件类型、URL、载荷及幂等键。Compose 可观测性 Profile 只在本机绑定 Prometheus，生产管理端点必须位于私有运维网络。
+
+认证遥测预注册 `success`、`failure`、`rate_limited`、`logout` 四种固定 `outcome` 序列。内存登录限流器维护一个按访问顺序淘汰的有界客户端 Map 和一个进程级窗口；指标与日志都不记录用户名、地址、Cookie、CSRF 值或 Session ID。
 
 演示 Receiver 提供 `/hooks/flaky?failures=N`，用于制造有上限、可重复的瞬时故障。它会先验证签名，再按配置返回 HTTP `503`，耗尽失败预算后恢复成功，从而无需外部服务即可审查同一条重试链路。
 

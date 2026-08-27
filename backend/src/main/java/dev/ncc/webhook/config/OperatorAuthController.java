@@ -1,6 +1,8 @@
 package dev.ncc.webhook.config;
 
 import dev.ncc.webhook.common.InvalidCredentialsException;
+import dev.ncc.webhook.common.LoginRateLimitException;
+import dev.ncc.webhook.config.OperatorAuthTelemetry.Outcome;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -35,16 +37,22 @@ public class OperatorAuthController {
   private final SecurityContextRepository securityContextRepository;
   private final SessionAuthenticationStrategy sessionAuthenticationStrategy;
   private final LogoutHandler logoutHandler;
+  private final OperatorLoginAttemptLimiter loginAttemptLimiter;
+  private final OperatorAuthTelemetry telemetry;
 
   OperatorAuthController(
       AuthenticationManager authenticationManager,
       SecurityContextRepository securityContextRepository,
       SessionAuthenticationStrategy sessionAuthenticationStrategy,
-      LogoutHandler logoutHandler) {
+      LogoutHandler logoutHandler,
+      OperatorLoginAttemptLimiter loginAttemptLimiter,
+      OperatorAuthTelemetry telemetry) {
     this.authenticationManager = authenticationManager;
     this.securityContextRepository = securityContextRepository;
     this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
     this.logoutHandler = logoutHandler;
+    this.loginAttemptLimiter = loginAttemptLimiter;
+    this.telemetry = telemetry;
   }
 
   @GetMapping("/csrf")
@@ -57,6 +65,13 @@ public class OperatorAuthController {
       @Valid @RequestBody LoginRequest login,
       HttpServletRequest request,
       HttpServletResponse response) {
+    String remoteAddress = request.getRemoteAddr();
+    var decision = loginAttemptLimiter.acquire(remoteAddress);
+    if (!decision.allowed()) {
+      telemetry.record(Outcome.RATE_LIMITED);
+      logger.warn("operator_login_rate_limited");
+      throw new LoginRateLimitException(decision.retryAfterSeconds());
+    }
     try {
       Authentication authentication =
           authenticationManager.authenticate(
@@ -67,9 +82,12 @@ public class OperatorAuthController {
       context.setAuthentication(authentication);
       SecurityContextHolder.setContext(context);
       securityContextRepository.saveContext(context, request, response);
-      logger.info("operator_login_succeeded username={}", authentication.getName());
+      loginAttemptLimiter.clearClient(remoteAddress);
+      telemetry.record(Outcome.SUCCESS);
+      logger.info("operator_login_succeeded");
       return new SessionResponse(authentication.getName());
     } catch (AuthenticationException exception) {
+      telemetry.record(Outcome.FAILURE);
       logger.warn("operator_login_failed");
       throw new InvalidCredentialsException();
     }
@@ -83,9 +101,9 @@ public class OperatorAuthController {
   @PostMapping("/logout")
   ResponseEntity<Void> logout(
       Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
-    String username = authentication.getName();
     logoutHandler.logout(request, response, authentication);
-    logger.info("operator_logout_succeeded username={}", username);
+    telemetry.record(Outcome.LOGOUT);
+    logger.info("operator_logout_succeeded");
     return ResponseEntity.noContent().build();
   }
 

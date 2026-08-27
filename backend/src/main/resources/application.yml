@@ -40,6 +40,13 @@ app:
   operator:
     username: ${APP_OPERATOR_USERNAME:}
     password: ${APP_OPERATOR_PASSWORD:}
+    login-limit:
+      client-max-attempts: ${APP_OPERATOR_LOGIN_CLIENT_MAX_ATTEMPTS:8}
+      global-max-attempts: ${APP_OPERATOR_LOGIN_GLOBAL_MAX_ATTEMPTS:64}
+      window: ${APP_OPERATOR_LOGIN_WINDOW:1m}
+      client-block-duration: ${APP_OPERATOR_LOGIN_CLIENT_BLOCK_DURATION:5m}
+      global-block-duration: ${APP_OPERATOR_LOGIN_GLOBAL_BLOCK_DURATION:1m}
+      max-client-entries: ${APP_OPERATOR_LOGIN_MAX_CLIENT_ENTRIES:1024}
   delivery:
     poll-interval: ${APP_DELIVERY_POLL_INTERVAL:1s}
     request-timeout: ${APP_DELIVERY_REQUEST_TIMEOUT:5s}

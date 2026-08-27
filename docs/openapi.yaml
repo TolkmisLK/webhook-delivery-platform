@@ -49,6 +49,8 @@ paths:
           $ref: "#/components/responses/InvalidCredentials"
         "403":
           $ref: "#/components/responses/AccessDenied"
+        "429":
+          $ref: "#/components/responses/LoginRateLimited"
   /api/auth/session:
     get:
       operationId: getOperatorSession
@@ -352,6 +354,18 @@ components:
             $ref: "#/components/schemas/ApiError"
     AccessDenied:
       description: CSRF validation or authorization failed. Error code is `access_denied`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    LoginRateLimited:
+      description: Login quota exceeded. Error code is `login_rate_limited`.
+      headers:
+        Retry-After:
+          description: Seconds until the rejected quota can be attempted again.
+          schema:
+            type: integer
+            minimum: 1
       content:
         application/json:
           schema:
