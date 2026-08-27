@@ -6,6 +6,13 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- Native single-operator session authentication with deployment-provided credentials.
+- CSRF protection for state-changing API requests, including session-bound token rotation.
+- Stable JSON authentication and authorization errors with request correlation IDs.
+- Bilingual sign-in, signed-in identity, and sign-out controls in the operations console.
+
 ## [0.4.0] - 2026-08-27
 
 ### Added / 新增

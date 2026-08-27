@@ -34,6 +34,7 @@ The first release intentionally uses a modular monolith and a PostgreSQL-backed 
 - Immutable per-delivery target URL and encrypted-secret snapshots across retries and replay
 - Versioned Endpoint signing-secret rotation without exposing secret material
 - Versioned Endpoint name and target-URL editing with full safety revalidation
+- Native single-operator sessions, CSRF-protected mutations, and stable access errors
 
 ### Quick start
 
@@ -45,6 +46,8 @@ docker compose up --build
 ```
 
 Open [http://localhost:8088](http://localhost:8088).
+
+Sign in with the development-only Compose defaults: `admin` / `local-admin-password`. Override `APP_OPERATOR_USERNAME` and `APP_OPERATOR_PASSWORD` through `.env` for any non-local deployment. When the public origin uses HTTPS, also set `APP_OPERATOR_COOKIE_SECURE=true`.
 
 The console is pre-filled for the included receiver:
 
@@ -109,7 +112,7 @@ The backend gate also checks Google Java Format and verifies the Spring Modulith
 
 ### Current scope
 
-`v0.4` adds race-safe cancellation, commit-consistent state updates, immutable target-configuration snapshots, and versioned Endpoint configuration controls. Name and target-URL edits re-run the complete URL safety policy; accepted deliveries keep their original target snapshot while newly accepted work uses the updated normalized URL. Secret rotation follows the same version contract, and receivers should temporarily accept both secret generations until older deliveries reach terminal states.
+`v0.5` adds a native access boundary for the single-operator console. Deployment-provided credentials create a server-side session; unsafe API requests require a session-bound CSRF token, and all `/api/**` operations (including SSE) require the operator role. Multi-user accounts, roles, tenant isolation, and external identity providers remain outside this release.
 
 ## 中文
 
@@ -140,6 +143,7 @@ Webhook Delivery Platform 是一个生产风格的全栈可靠事件投递参考
 - 在重试与重投期间保持不变的任务级目标 URL 与加密密钥快照
 - 不暴露密钥内容且带版本校验的 Endpoint 签名密钥轮换
 - 重新执行完整安全校验且带版本控制的 Endpoint 名称与目标地址编辑
+- 原生单操作者会话、带 CSRF 防护的写请求，以及稳定访问错误结构
 
 ### 快速开始
 
@@ -151,6 +155,8 @@ docker compose up --build
 ```
 
 访问 [http://localhost:8088](http://localhost:8088)。
+
+使用 Compose 中仅供开发的默认凭据登录：`admin` / `local-admin-password`。任何非本地部署都必须通过 `.env` 覆盖 `APP_OPERATOR_USERNAME` 与 `APP_OPERATOR_PASSWORD`；公网入口启用 HTTPS 后，还应设置 `APP_OPERATOR_COOKIE_SECURE=true`。
 
 控制台已经预填演示 Receiver 信息：
 
@@ -218,7 +224,7 @@ PostgreSQL 集成测试会启动真实目标服务，通过 API 验证幂等接�
 
 ### 当前范围
 
-`v0.4` 增加排队任务的并发安全取消、提交一致的状态更新、已接收任务的不可变目标配置快照，以及带版本校验的 Endpoint 配置控制。名称与目标地址编辑会重新执行完整 URL 安全策略；已接收任务保留原目标快照，新接收任务使用更新后的规范化 URL。密钥轮换沿用相同版本契约，旧任务进入终态前，接收端应暂时同时接受两代密钥。
+`v0.5` 为单操作者控制台增加原生访问边界。部署提供的凭据会建立服务端会话；不安全方法的 API 请求必须携带与会话绑定的 CSRF Token，全部 `/api/**` 操作（包括 SSE）都要求操作者角色。多人账号、角色、租户隔离与外部身份提供方不在本版本范围内。
 
 ## License
 

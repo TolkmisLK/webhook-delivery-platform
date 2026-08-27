@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { StatusBadge } from "./components/StatusBadge";
-import { api } from "./lib/api";
+import { api, ApiRequestError } from "./lib/api";
 import type { Delivery, DeliveryDetail, DeliveryStats, Endpoint } from "./lib/types";
 import {
   canCancelDelivery,
@@ -11,6 +11,10 @@ import {
 } from "./lib/view";
 
 type Locale = "en" | "zh";
+type AuthState =
+  | { status: "checking" }
+  | { status: "signed-out" }
+  | { status: "signed-in"; username: string };
 
 interface EventFormState {
   endpointId: string;
@@ -80,6 +84,16 @@ const copy = {
     confirmRotation: "Confirm rotation",
     cancelRotation: "Cancel",
     noActiveEndpoints: "No active endpoint",
+    signInEyebrow: "Protected operator console",
+    signInTitle: "Sign in to continue",
+    signInHelp: "Use the single operator credentials configured for this deployment.",
+    username: "Username",
+    password: "Password",
+    signIn: "Sign in",
+    signingIn: "Signing in…",
+    checkingSession: "Checking operator session…",
+    signedInAs: "Signed in as",
+    signOut: "Sign out",
   },
   zh: {
     eyebrow: "NCC · 基础设施公开项目",
@@ -141,6 +155,16 @@ const copy = {
     confirmRotation: "确认轮换",
     cancelRotation: "取消",
     noActiveEndpoints: "暂无已启用 Endpoint",
+    signInEyebrow: "受保护的运维控制台",
+    signInTitle: "登录后继续",
+    signInHelp: "请输入当前部署配置的单操作者账号与密码。",
+    username: "用户名",
+    password: "密码",
+    signIn: "登录",
+    signingIn: "正在登录…",
+    checkingSession: "正在检查运维会话…",
+    signedInAs: "当前账号",
+    signOut: "退出登录",
   },
 } as const;
 
@@ -158,6 +182,7 @@ const emptyStats: DeliveryStats = {
 
 export function App() {
   const [locale, setLocale] = useState<Locale>("en");
+  const [auth, setAuth] = useState<AuthState>({ status: "checking" });
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [stats, setStats] = useState<DeliveryStats>(emptyStats);
@@ -166,6 +191,7 @@ export function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [streamConnected, setStreamConnected] = useState(false);
+  const [loginForm, setLoginForm] = useState({ username: "admin", password: "" });
   const [endpointForm, setEndpointForm] = useState({
     name: "Local demo receiver",
     url: "http://receiver:8090/hooks",
@@ -180,6 +206,16 @@ export function App() {
     data: '{\n  "result": "ok",\n  "source": "console"\n}',
   });
   const t = copy[locale];
+
+  const handleError = useCallback((cause: unknown) => {
+    if (cause instanceof ApiRequestError && cause.status === 401) {
+      api.resetSessionState();
+      setAuth({ status: "signed-out" });
+      setStreamConnected(false);
+      return;
+    }
+    setError(messageOf(cause));
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -197,18 +233,44 @@ export function App() {
       }));
       setError(null);
     } catch (loadError) {
-      setError(messageOf(loadError));
+      handleError(loadError);
     }
+  }, [handleError]);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        await api.refreshCsrf();
+        const session = await api.getSession();
+        if (active) setAuth({ status: "signed-in", username: session.username });
+      } catch (sessionError) {
+        if (!active) return;
+        if (sessionError instanceof ApiRequestError && sessionError.status === 401) {
+          setAuth({ status: "signed-out" });
+        } else {
+          setError(messageOf(sessionError));
+          setAuth({ status: "signed-out" });
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
+    if (auth.status !== "signed-in") return;
     void load();
     const stream = new EventSource("/api/deliveries/stream");
     stream.onopen = () => setStreamConnected(true);
     stream.addEventListener("delivery", () => void load());
-    stream.onerror = () => setStreamConnected(false);
+    stream.onerror = () => {
+      setStreamConnected(false);
+      void api.getSession().catch(handleError);
+    };
     return () => stream.close();
-  }, [load]);
+  }, [auth.status, handleError, load]);
 
   const statCards = useMemo(
     () => [
@@ -230,6 +292,39 @@ export function App() {
       setNotice(locale === "zh" ? "Endpoint 已创建。" : "Endpoint created.");
       await load();
     });
+  }
+
+  async function signIn(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const session = await api.login(loginForm.username, loginForm.password);
+      setLoginForm((current) => ({ ...current, password: "" }));
+      setAuth({ status: "signed-in", username: session.username });
+    } catch (loginError) {
+      setError(messageOf(loginError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function signOut() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.logout();
+      setAuth({ status: "signed-out" });
+      setEndpoints([]);
+      setDeliveries([]);
+      setStats(emptyStats);
+      setSelectedDelivery(null);
+      setStreamConnected(false);
+    } catch (logoutError) {
+      handleError(logoutError);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function publishEvent(event: FormEvent) {
@@ -315,10 +410,38 @@ export function App() {
     try {
       await action();
     } catch (actionError) {
-      setError(messageOf(actionError));
+      handleError(actionError);
     } finally {
       setBusy(false);
     }
+  }
+
+  if (auth.status !== "signed-in") {
+    return (
+      <div className="app-shell auth-shell">
+        <header className="topbar">
+          <a className="brand" href="#top">NCC</a>
+          <button className="ghost-button" type="button" onClick={() => setLocale(locale === "en" ? "zh" : "en")}>
+            {locale === "en" ? "中文" : "EN"}
+          </button>
+        </header>
+        <main id="top" className="auth-main">
+          <section className="auth-card" aria-labelledby="auth-title">
+            <p className="eyebrow">{t.signInEyebrow}</p>
+            <h1 id="auth-title">{t.signInTitle}</h1>
+            <p>{auth.status === "checking" ? t.checkingSession : t.signInHelp}</p>
+            {error && <div className="message message-error" role="alert">{error}</div>}
+            {auth.status === "signed-out" && (
+              <form className="auth-form" onSubmit={signIn}>
+                <label>{t.username}<input autoFocus required maxLength={120} autoComplete="username" value={loginForm.username} onChange={(event) => setLoginForm({ ...loginForm, username: event.target.value })} /></label>
+                <label>{t.password}<input required maxLength={512} type="password" autoComplete="current-password" value={loginForm.password} onChange={(event) => setLoginForm({ ...loginForm, password: event.target.value })} /></label>
+                <button className="primary-button" disabled={busy} type="submit">{busy ? t.signingIn : t.signIn}</button>
+              </form>
+            )}
+          </section>
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -329,9 +452,11 @@ export function App() {
           <span className={`live-indicator${streamConnected ? "" : " reconnecting"}`}>
             <i /> {streamConnected ? t.live : t.reconnecting}
           </span>
+          <span className="operator-identity">{t.signedInAs} <strong>{auth.username}</strong></span>
           <button className="ghost-button" type="button" onClick={() => setLocale(locale === "en" ? "zh" : "en")}>
             {locale === "en" ? "中文" : "EN"}
           </button>
+          <button className="ghost-button" disabled={busy} type="button" onClick={() => void signOut()}>{t.signOut}</button>
         </div>
       </header>
 
