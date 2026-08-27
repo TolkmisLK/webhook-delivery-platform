@@ -6,6 +6,12 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- Entered the v1.0 development cycle with aligned backend, frontend, and OpenAPI versions.
+- Published the bilingual 1.x HTTP API compatibility and deprecation policy.
+- Completed protected-operation access errors, request-correlation semantics, and delivery SSE documentation in OpenAPI.
+
 ## [0.5.0] - 2026-08-27
 
 ### Added / 新增

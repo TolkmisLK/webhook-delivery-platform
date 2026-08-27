@@ -50,13 +50,36 @@ class OperatorAuthWebTest {
   @Autowired JsonMapper jsonMapper;
 
   @Test
-  void returnsStableJsonWhenAuthenticationIsMissing() throws Exception {
+  void preservesSafeRequestIdAcrossAuthenticationErrors() throws Exception {
+    String requestId = "client-request-123";
+
     mockMvc
-        .perform(get("/api/auth/session"))
+        .perform(get("/api/auth/session").header(RequestIdFilter.HEADER, requestId))
         .andExpect(status().isUnauthorized())
-        .andExpect(header().exists(RequestIdFilter.HEADER))
+        .andExpect(header().string(RequestIdFilter.HEADER, requestId))
         .andExpect(jsonPath("$.code").value("unauthenticated"))
-        .andExpect(jsonPath("$.requestId").isNotEmpty());
+        .andExpect(jsonPath("$.requestId").value(requestId));
+  }
+
+  @Test
+  void replacesUnsafeRequestIdAndCorrelatesTheSecurityError() throws Exception {
+    var result =
+        mockMvc
+            .perform(
+                get("/api/auth/session")
+                    .header(RequestIdFilter.HEADER, "unsafe request id with spaces"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(header().exists(RequestIdFilter.HEADER))
+            .andExpect(jsonPath("$.code").value("unauthenticated"))
+            .andReturn();
+
+    String responseId = result.getResponse().getHeader(RequestIdFilter.HEADER);
+    String errorId =
+        jsonMapper.readTree(result.getResponse().getContentAsString()).get("requestId").asText();
+
+    assertThat(responseId)
+        .matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+        .isEqualTo(errorId);
   }
 
   @Test
@@ -90,13 +113,16 @@ class OperatorAuthWebTest {
             .perform(
                 post("/api/auth/login")
                     .with(csrf())
+                    .header(RequestIdFilter.HEADER, "login-attempt-1")
                     .contentType("application/json")
                     .content(
                         """
                         {"username":"test-operator","password":"wrong-password-value"}
                         """))
             .andExpect(status().isUnauthorized())
+            .andExpect(header().string(RequestIdFilter.HEADER, "login-attempt-1"))
             .andExpect(jsonPath("$.code").value("invalid_credentials"))
+            .andExpect(jsonPath("$.requestId").value("login-attempt-1"))
             .andReturn()
             .getResponse()
             .getContentAsString();

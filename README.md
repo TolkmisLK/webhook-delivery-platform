@@ -107,13 +107,14 @@ The backend gate also checks Google Java Format and verifies the Spring Modulith
 - [Security model](docs/security.md)
 - [Security reporting](SECURITY.md)
 - [OpenAPI contract](docs/openapi.yaml)
+- [API compatibility policy](docs/api-compatibility.md)
 - [ADR-0001: PostgreSQL-backed delivery queue](docs/adr/0001-postgresql-delivery-queue.md)
 - [Contributing](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
 
 ### Current scope
 
-`v0.5` adds a native access boundary for the single-operator console. Deployment-provided credentials create a server-side session; unsafe API requests require a session-bound CSRF token, and all `/api/**` operations (including SSE) require the operator role. Login attempts are bounded per remote address and per process before BCrypt verification, with fixed-cardinality outcome telemetry. Multi-user accounts, distributed rate limiting, roles, tenant isolation, and external identity providers remain outside this release.
+`v1.0` development stabilizes the existing single-operator HTTP boundary without expanding it into an identity platform. The documented routes, schemas, error codes, request-correlation behavior, and delivery SSE events follow the published 1.x compatibility policy. Multi-user accounts, distributed rate limiting, roles, tenant isolation, and external identity providers remain outside this release.
 
 ## 中文
 
@@ -220,13 +221,14 @@ PostgreSQL 集成测试会启动真实目标服务，通过 API 验证幂等接�
 - [安全模型](docs/security.md)
 - [安全问题报告](SECURITY.md)
 - [OpenAPI 契约](docs/openapi.yaml)
+- [API 兼容性政策](docs/api-compatibility.md)
 - [ADR-0001：PostgreSQL 投递队列](docs/adr/0001-postgresql-delivery-queue.md)
 - [贡献指南](CONTRIBUTING.md)
 - [变更记录](CHANGELOG.md)
 
 ### 当前范围
 
-`v0.5` 为单操作者控制台增加原生访问边界。部署提供的凭据会建立服务端会话；不安全方法的 API 请求必须携带与会话绑定的 CSRF Token，全部 `/api/**` 操作（包括 SSE）都要求操作者角色。系统会在 BCrypt 校验前按远端地址和单个进程限制登录尝试，并暴露固定基数结果指标。多人账号、分布式限流、角色、租户隔离与外部身份提供方不在本版本范围内。
+`v1.0` 开发阶段将稳定现有单操作者 HTTP 边界，而不会把它扩展为身份平台。已记录的路由、Schema、错误码、请求关联行为与投递 SSE 事件遵循公开的 1.x 兼容性政策。多人账号、分布式限流、角色、租户隔离与外部身份提供方仍不在本版本范围内。
 
 ## License
 

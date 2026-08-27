@@ -1,19 +1,25 @@
 openapi: 3.1.0
 info:
   title: Webhook Delivery Platform API
-  version: 0.5.0
+  version: 1.0.0
   license:
     name: MIT
     identifier: MIT
   description: |
     Durable webhook endpoint, event, and delivery operations.
     持久化 Webhook Endpoint、事件与投递任务 API。
+
+    Clients may send `X-Request-Id` on any request. Every response echoes the
+    effective identifier; unsafe or missing values are replaced with a UUID.
+    The 1.x compatibility policy is documented in `docs/api-compatibility.md`.
 servers:
   - url: /
 security:
   - cookieAuth: []
 paths:
   /api/auth/csrf:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     get:
       operationId: getCsrfToken
       summary: Obtain CSRF metadata / 获取 CSRF 元数据
@@ -21,11 +27,16 @@ paths:
       responses:
         "200":
           description: The current session-bound CSRF token and required request header.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/CsrfMetadata"
   /api/auth/login:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     post:
       operationId: loginOperator
       summary: Start an operator session / 创建操作者会话
@@ -41,6 +52,9 @@ paths:
       responses:
         "200":
           description: Credentials accepted and the session identifier rotated.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
@@ -52,12 +66,17 @@ paths:
         "429":
           $ref: "#/components/responses/LoginRateLimited"
   /api/auth/session:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     get:
       operationId: getOperatorSession
       summary: Inspect the current operator session / 查询当前操作者会话
       responses:
         "200":
           description: Authenticated operator identity.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
@@ -65,6 +84,8 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthenticated"
   /api/auth/logout:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     post:
       operationId: logoutOperator
       summary: End the operator session / 结束操作者会话
@@ -73,23 +94,33 @@ paths:
       responses:
         "204":
           description: Session invalidated and authentication cookies cleared.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/AccessDenied"
   /api/endpoints:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     get:
       operationId: listEndpoints
       summary: List registered endpoints / 查询 Endpoint
       responses:
         "200":
           description: Registered endpoints ordered by creation time.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/Endpoint"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
     post:
       operationId: createEndpoint
       summary: Register an endpoint / 注册 Endpoint
@@ -104,13 +135,22 @@ paths:
       responses:
         "201":
           description: Endpoint created. The signing secret is not returned.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Endpoint"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/AccessDenied"
   /api/endpoints/{endpointId}:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     put:
       operationId: updateEndpoint
       summary: Update an endpoint name and target URL / 更新 Endpoint 名称与目标 URL
@@ -129,17 +169,26 @@ paths:
       responses:
         "200":
           description: Endpoint updated or already equal after normalization.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Endpoint"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/AccessDenied"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/VersionConflict"
   /api/endpoints/{endpointId}/status:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     patch:
       operationId: setEndpointStatus
       summary: Activate or deactivate an endpoint / 启用或停用 Endpoint
@@ -155,17 +204,26 @@ paths:
       responses:
         "200":
           description: Endpoint status updated or already in the requested state.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Endpoint"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/AccessDenied"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/VersionConflict"
   /api/endpoints/{endpointId}/secret:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     patch:
       operationId: rotateEndpointSecret
       summary: Rotate an endpoint signing secret / 轮换 Endpoint 签名密钥
@@ -184,17 +242,26 @@ paths:
       responses:
         "200":
           description: Secret rotated. No secret material is returned.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Endpoint"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/AccessDenied"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/VersionConflict"
   /api/events:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     post:
       operationId: publishEvent
       summary: Accept an event / 接收事件
@@ -209,15 +276,24 @@ paths:
       responses:
         "202":
           description: Existing idempotent result or newly persisted delivery job.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/PublishedEvent"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/AccessDenied"
         "404":
           $ref: "#/components/responses/NotFound"
   /api/deliveries:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     get:
       operationId: listDeliveries
       summary: List recent deliveries / 查询最近投递
@@ -232,24 +308,38 @@ paths:
       responses:
         "200":
           description: Recent delivery jobs.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/Delivery"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
   /api/deliveries/stats:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     get:
       operationId: getDeliveryStats
       summary: Delivery counts by state / 按状态统计投递
       responses:
         "200":
           description: Delivery counts.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeliveryStats"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
   /api/deliveries/{deliveryId}:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     get:
       operationId: getDeliveryDetail
       summary: Inspect delivery attempts / 查看投递尝试
@@ -258,13 +348,20 @@ paths:
       responses:
         "200":
           description: Delivery job and its committed attempt timeline.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeliveryDetail"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
         "404":
           $ref: "#/components/responses/NotFound"
   /api/deliveries/{deliveryId}/replay:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     post:
       operationId: replayDelivery
       summary: Queue a delivery for replay / 重新投递
@@ -274,15 +371,24 @@ paths:
       responses:
         "200":
           description: Delivery returned to PENDING with an extended attempt budget.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Delivery"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/AccessDenied"
         "404":
           $ref: "#/components/responses/NotFound"
   /api/deliveries/{deliveryId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     post:
       operationId: cancelDelivery
       summary: Cancel queued delivery work / 取消排队中的推送任务
@@ -292,25 +398,58 @@ paths:
       responses:
         "200":
           description: Delivery is CANCELED; repeating the request is idempotent.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Delivery"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/AccessDenied"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/DeliveryStateConflict"
   /api/deliveries/stream:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
     get:
       operationId: streamDeliveryUpdates
       summary: Stream delivery state changes / 订阅投递状态
       responses:
         "200":
-          description: Server-sent events named `delivery`.
+          description: |
+            Server-sent events named `connected` or `delivery`. The JSON value
+            in each `data` field conforms to the documented event-data schema.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
             text/event-stream:
               schema:
                 type: string
+                description: UTF-8 SSE frames whose `data` value is JSON.
+                x-event-data-schema:
+                  type: object
+                  required: [deliveryId, status, occurredAt]
+                  properties:
+                    deliveryId:
+                      type: [string, "null"]
+                      format: uuid
+                      description: Null for the initial `connected` event.
+                    status:
+                      type: string
+                      enum:
+                        [CONNECTED, PENDING, PROCESSING, RETRY_SCHEDULED, SUCCEEDED, DEAD, CANCELED]
+                    occurredAt: { type: string, format: date-time }
+              example: |
+                event: delivery
+                data: {"deliveryId":"58cbfdaa-1b54-4b0b-9c8f-d38d74528262","status":"SUCCEEDED","occurredAt":"2026-08-27T12:00:00Z"}
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
 components:
   securitySchemes:
     cookieAuth:
@@ -318,6 +457,19 @@ components:
       in: cookie
       name: JSESSIONID
   parameters:
+    RequestIdHeader:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: |
+        Caller-supplied correlation identifier. Values must contain only ASCII
+        letters, digits, `.`, `_`, `:`, or `-`; unsafe or missing values are
+        replaced with a UUID and the effective value is returned in every response.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+        pattern: "^[A-Za-z0-9._:-]+$"
     CsrfHeader:
       name: X-CSRF-TOKEN
       in: header
@@ -339,21 +491,38 @@ components:
       schema:
         type: string
         format: uuid
+  headers:
+    RequestId:
+      description: Effective request correlation identifier.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+        pattern: "^[A-Za-z0-9._:-]+$"
   responses:
     Unauthenticated:
       description: No valid operator session. Error code is `unauthenticated`.
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/RequestId"
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ApiError"
     InvalidCredentials:
       description: The supplied credentials are invalid. Error code is `invalid_credentials`.
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/RequestId"
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ApiError"
     AccessDenied:
       description: CSRF validation or authorization failed. Error code is `access_denied`.
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/RequestId"
       content:
         application/json:
           schema:
@@ -361,6 +530,8 @@ components:
     LoginRateLimited:
       description: Login quota exceeded. Error code is `login_rate_limited`.
       headers:
+        X-Request-Id:
+          $ref: "#/components/headers/RequestId"
         Retry-After:
           description: Seconds until the rejected quota can be attempted again.
           schema:
@@ -372,24 +543,36 @@ components:
             $ref: "#/components/schemas/ApiError"
     BadRequest:
       description: Invalid request.
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/RequestId"
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ApiError"
     NotFound:
       description: Resource not found.
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/RequestId"
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ApiError"
     VersionConflict:
       description: The endpoint version is stale and must be refreshed.
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/RequestId"
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ApiError"
     DeliveryStateConflict:
       description: The delivery is no longer queued and cannot be canceled.
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/RequestId"
       content:
         application/json:
           schema:
@@ -569,7 +752,7 @@ components:
       enum: [PENDING, PROCESSING, RETRY_SCHEDULED, SUCCEEDED, DEAD, CANCELED]
     ApiError:
       type: object
-      required: [timestamp, status, code, message, fields]
+      required: [timestamp, status, code, message, fields, requestId]
       properties:
         timestamp: { type: string, format: date-time }
         status: { type: integer }
@@ -578,4 +761,8 @@ components:
         fields:
           type: object
           additionalProperties: { type: string }
-        requestId: { type: [string, "null"] }
+        requestId:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Matches the effective `X-Request-Id` response header.
