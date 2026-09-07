@@ -1,41 +1,24 @@
 # Webhook Delivery Platform
 
-> Durable, signed, and observable webhook delivery.  
-> 持久化、可签名、可观测的 Webhook 投递平台。
+Send events to HTTP endpoints, retry failures, and inspect delivery history.  
+将事件推送到 HTTP 接口，自动重试失败请求，并查看投递记录。
 
 [English](#english) · [中文](#中文)
 
 ## English
 
-Webhook Delivery Platform is a production-style full-stack reference implementation for reliable outbound events. It accepts an event once, persists a delivery job in PostgreSQL, signs the exact request body, and records every delivery outcome for review and replay.
+Webhook Delivery Platform accepts events through an API and sends them to registered HTTP endpoints. Jobs are stored in PostgreSQL so a worker can pick them up after a restart. Each request is signed, and the React console shows the result of each delivery attempt.
 
-The first release intentionally uses a modular monolith and a PostgreSQL-backed queue. This keeps the consistency boundary explicit while still supporting multiple workers through `FOR UPDATE SKIP LOCKED` leases.
+Built with Java 21, Spring Boot, PostgreSQL, and React. It uses a PostgreSQL queue with `FOR UPDATE SKIP LOCKED` leases to coordinate workers.
 
-### Engineering evidence
+### Features
 
-- Java 21, Spring Boot 4.1, Spring Modulith 2.1, PostgreSQL, and Flyway
-- React 19, strict TypeScript, Vite, responsive operations console, and SSE updates
-- At-least-once delivery with idempotent event acceptance
-- HMAC-SHA256 signatures over timestamp and exact request body
-- Exponential backoff, bounded attempts, dead letters, and manual replay
-- AES-256-GCM encryption for endpoint signing secrets
-- URL validation, public-address policy, port allowlist, no redirects, and bounded responses
-- Database leases that recover abandoned `PROCESSING` jobs
-- Bounded virtual-thread execution so jobs are leased only when outbound capacity is available
-- Unit tests, architecture verification, PostgreSQL integration test, frontend tests, and GitHub Actions
-- Docker Compose demo with a signature-verifying receiver
-- Delivery-attempt detail API and bilingual timeline for committed outcomes
-- After-commit Micrometer attempt counters, duration timers, and structured completion logs
-- Controlled transient-failure receiver for demonstrating retry recovery
-- Reversible Endpoint activation with optimistic version checks and stable conflict responses
-- Prometheus queue-health gauges with bounded status tags and runnable-job age
-- Race-safe, idempotent cancellation for queued delivery jobs
-- Commit-consistent SSE state notifications and after-commit operator action logs
-- Immutable per-delivery target URL and encrypted-secret snapshots across retries and replay
-- Versioned Endpoint signing-secret rotation without exposing secret material
-- Versioned Endpoint name and target-URL editing with full safety revalidation
-- Native single-operator sessions, CSRF-protected mutations, and stable access errors
-- Bounded login throttling and fixed-cardinality authentication outcome metrics
+- **Delivery:** idempotent event acceptance, automatic retries with exponential backoff, dead-letter status, cancellation, and manual replay. Delivery is at-least-once, so receivers must deduplicate events by `X-Webhook-Id`.
+- **Endpoint management:** edit names and URLs, pause endpoints, and rotate signing secrets. Version checks detect conflicting updates. Existing jobs keep their original URL and secret snapshot.
+- **Request security:** HMAC-SHA256 signatures, encrypted signing secrets, and checks on destination URLs, addresses, ports, redirects, and response sizes. See the [security model](docs/security.md) for deployment requirements.
+- **Console and monitoring:** delivery history, live status updates through SSE, Prometheus metrics, and operator action logs. Status notifications and attempt metrics are emitted after the database transaction commits.
+- **Operator access:** one configured operator account, cookie sessions, CSRF protection, and login throttling.
+- **Local demo:** Docker Compose starts the app, database, and a receiver that verifies signatures and can simulate failed requests.
 
 ### Quick start
 
@@ -93,13 +76,13 @@ The signed message is:
 
 Consumers should reject stale timestamps and compare signatures in constant time. The included demo receiver implements constant-time verification.
 
-### Quality checks
+### Development checks
 
 ```bash
 ./scripts/check.sh
 ```
 
-The backend gate also checks Google Java Format and verifies the Spring Modulith dependency graph. The PostgreSQL integration test starts an actual target server, confirms idempotent acceptance, waits for the scheduled worker, and cryptographically verifies a successful signed delivery.
+The backend checks also verify Java formatting and the Spring Modulith dependency graph. The PostgreSQL integration test starts an actual target server, confirms idempotent acceptance, waits for the scheduled worker, and cryptographically verifies a successful signed delivery.
 
 ### Documentation
 
@@ -116,39 +99,24 @@ The backend gate also checks Google Java Format and verifies the Spring Modulith
 
 ### Current scope
 
-`v1.0.0` stabilizes the existing single-operator HTTP boundary without expanding it into an identity platform. The documented routes, schemas, error codes, request-correlation behavior, and delivery SSE events follow the published 1.x compatibility policy. Multi-user accounts, distributed rate limiting, roles, tenant isolation, and external identity providers remain outside this release.
+The latest release is [v1.0.0](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0). It supports one configured operator account. Multi-user accounts, roles, tenant isolation, external identity providers, and distributed rate limiting are not implemented.
+
+The HTTP API and SSE events follow the [1.x compatibility policy](docs/api-compatibility.md). Before deploying beyond the local demo, follow the [deployment checklist](docs/production-readiness.md) and [backup and recovery guide](docs/operations-recovery.md).
 
 ## 中文
 
-Webhook Delivery Platform 是一个生产风格的全栈可靠事件投递参考实现。系统接收事件后，先在 PostgreSQL 中持久化投递任务，再对完整请求体签名，并记录每次投递结果，支持审查和重新投递。
+Webhook Delivery Platform 通过 API 接收事件，再发送到已注册的 HTTP 接口。任务保存在 PostgreSQL 中，服务重启后可由 Worker 继续处理。每个请求都会签名，React 控制台可以查看每次投递的结果。
 
-首个版本采用模块化单体与 PostgreSQL 队列，在保持事务边界清晰的同时，通过 `FOR UPDATE SKIP LOCKED` 租约支持多个 Worker 协同处理。
+项目使用 Java 21、Spring Boot、PostgreSQL 和 React。队列直接使用 PostgreSQL，通过 `FOR UPDATE SKIP LOCKED` 和任务租约协调多个 Worker。
 
-### 工程能力
+### 主要功能
 
-- Java 21、Spring Boot 4.1、Spring Modulith 2.1、PostgreSQL 与 Flyway
-- React 19、严格 TypeScript、Vite、响应式运维控制台与 SSE 更新
-- At-least-once 投递语义与幂等事件接收
-- 基于时间戳和完整请求体的 HMAC-SHA256 签名
-- 指数退避、有限尝试、死信状态和手动重投
-- 使用 AES-256-GCM 加密 Endpoint 签名密钥
-- URL 校验、公网地址策略、端口白名单、禁止重定向和响应大小限制
-- 数据库任务租约，以及异常中断后对 `PROCESSING` 任务的恢复
-- 有并发上限的虚拟线程执行器，只在存在出站容量时抢占任务
-- 单元测试、模块架构验证、PostgreSQL 集成测试、前端测试和 GitHub Actions
-- 包含签名验证 Receiver 的 Docker Compose 演示环境
-- 投递详情 API，以及展示已提交结果的中英双语尝试时间线
-- 事务提交后记录的 Micrometer 尝试计数、耗时指标与结构化完成日志
-- 用于演示重试恢复的可控瞬时失败 Receiver
-- 支持乐观版本校验与稳定冲突响应的可逆 Endpoint 启停控制
-- 使用固定状态标签与可运行任务年龄的 Prometheus 队列健康指标
-- 支持并发安全和幂等操作的排队任务取消能力
-- 只反映已提交状态的 SSE 通知，以及提交后的人工操作日志
-- 在重试与重投期间保持不变的任务级目标 URL 与加密密钥快照
-- 不暴露密钥内容且带版本校验的 Endpoint 签名密钥轮换
-- 重新执行完整安全校验且带版本控制的 Endpoint 名称与目标地址编辑
-- 原生单操作者会话、带 CSRF 防护的写请求，以及稳定访问错误结构
-- 有界登录限流与固定基数认证结果指标
+- **事件投递：** 幂等接收、指数退避重试、死信状态、任务取消和手动重投。采用至少一次（at-least-once）投递语义，接收方需要按 `X-Webhook-Id` 去重。
+- **接收端管理：** 修改名称和地址、暂停接收端、轮换签名密钥。版本校验用于识别并发修改；已有任务继续使用创建时的地址和密钥快照。
+- **请求安全：** HMAC-SHA256 签名、签名密钥加密，以及目标 URL、地址、端口、重定向和响应大小检查。部署要求见[安全模型](docs/security.md)。
+- **控制台与监控：** 投递历史、SSE 实时状态、Prometheus 指标和人工操作日志。状态通知和尝试指标在数据库事务提交后发出。
+- **登录管理：** 一个预设操作者账号、Cookie 会话、CSRF 防护和登录限流。
+- **本地演示：** Docker Compose 启动应用、数据库和接收服务；接收服务支持验签和模拟请求失败。
 
 ### 快速开始
 
@@ -174,9 +142,9 @@ docker compose up --build
 http://receiver:8090/hooks/flaky?failures=2
 ```
 
-Receiver 会针对每个事件先返回两次 HTTP `503`，随后成功。可通过“查看详情”审查已提交的尝试时间线；运行时指标包括 `/actuator/metrics/webhook.delivery.attempts`、`/actuator/metrics/webhook.delivery.duration` 与 `/actuator/metrics/webhook.operator.authentication`。
+Receiver 会针对每个事件先返回两次 HTTP `503`，随后成功。可通过“查看详情”查看每次请求的结果和耗时；运行时指标包括 `/actuator/metrics/webhook.delivery.attempts`、`/actuator/metrics/webhook.delivery.duration` 与 `/actuator/metrics/webhook.operator.authentication`。
 
-如需使用可复现的 Prometheus 视图，可启动可选的可观测性 Profile：
+如需查看 Prometheus 指标，可启用 Compose 的 `observability` 配置：
 
 ```bash
 docker compose --profile observability up --build
@@ -206,16 +174,15 @@ X-Webhook-Signature: v1=<HMAC-SHA256>
 
 接收方应拒绝过期时间戳，并使用常量时间算法比较签名。仓库内的 Demo Receiver 已实现常量时间校验。
 
-### 质量检查
+### 开发检查
 
 ```bash
-cd backend && mvn -B verify
-cd frontend && npm ci && npm run check
+./scripts/check.sh
 ```
 
 PostgreSQL 集成测试会启动真实目标服务，通过 API 验证幂等接收，等待定时 Worker 处理，并对成功投递执行真实签名校验。
 
-后端质量门禁还会检查 Google Java Format，并验证 Spring Modulith 依赖图不存在循环依赖。
+后端检查还包括 Google Java Format，并验证 Spring Modulith 依赖图不存在循环依赖。
 
 ### 项目文档
 
@@ -232,7 +199,9 @@ PostgreSQL 集成测试会启动真实目标服务，通过 API 验证幂等接�
 
 ### 当前范围
 
-`v1.0.0` 已稳定现有单操作者 HTTP 边界，而不会把它扩展为身份平台。已记录的路由、Schema、错误码、请求关联行为与投递 SSE 事件遵循公开的 1.x 兼容性政策。多人账号、分布式限流、角色、租户隔离与外部身份提供方仍不在本版本范围内。
+最新版本为 [v1.0.0](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0)，支持一个预设操作者账号。目前没有实现多人账号、角色、租户隔离、外部身份提供方和分布式限流。
+
+HTTP API 和 SSE 事件遵循 [1.x 兼容性政策](docs/api-compatibility.md)。在本地演示以外的环境部署前，请按照[部署检查清单](docs/production-readiness.md)和[备份恢复说明](docs/operations-recovery.md)完成配置。
 
 ## License
 
