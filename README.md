@@ -56,6 +56,8 @@ docker compose --profile observability up --build
 
 Open [http://localhost:9090/targets](http://localhost:9090/targets) and query `webhook_delivery_jobs`, `webhook_delivery_oldest_runnable_age_seconds`, or `webhook_operator_authentication_total`. The Prometheus port is bound to `127.0.0.1`; the frontend proxies only health checks, not metrics. In production, keep all management endpoints on a private operations network.
 
+[Retry walkthrough and runnable example](docs/demo.md)
+
 ### Delivery contract
 
 Every request contains:
@@ -153,6 +155,8 @@ docker compose --profile observability up --build
 访问 [http://localhost:9090/targets](http://localhost:9090/targets)，可查询 `webhook_delivery_jobs`、`webhook_delivery_oldest_runnable_age_seconds` 或 `webhook_operator_authentication_total`。Prometheus 端口仅绑定 `127.0.0.1`，前端也只代理健康检查而不会公开指标。生产环境必须将所有管理端点限制在私有运维网络。
 
 注册 Endpoint 并发布示例事件后，可以观察任务从 `PENDING` 进入 `SUCCEEDED`。
+
+[一步步运行重试演示](docs/demo.md)
 
 ### 投递协议
 
