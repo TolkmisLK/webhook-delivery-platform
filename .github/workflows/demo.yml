@@ -40,6 +40,11 @@ jobs:
         run: |
           set -o pipefail
           node --env-file=.env scripts/demo-retry.mjs | tee retry-demo.txt
+      - name: Show service health
+        if: failure()
+        run: |
+          docker compose ps -a
+          docker compose ps -aq | xargs -r docker inspect --format '{{.Name}} {{json .State.Health}}'
       - name: Receiver results
         if: always()
         run: docker compose logs --no-color receiver

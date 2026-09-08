@@ -25,7 +25,7 @@ services:
     volumes:
       - ./examples/demo-receiver.mjs:/app/demo-receiver.mjs:ro
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8090/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/health"]
       interval: 5s
       timeout: 3s
       retries: 10
