@@ -28,7 +28,7 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 - Bilingual sign-in, signed-in identity, and sign-out controls in the operations console.
 - Bounded per-client and process-wide login throttling with stable HTTP 429 responses.
 - Fixed-cardinality authentication outcome metrics and metadata-only security logs.
-
+  哎，真没意思
 ## [0.4.0] - 2026-08-27
 
 ### Added / 新增
