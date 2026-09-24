@@ -3,22 +3,17 @@
 Send events to HTTP endpoints, retry failures, and inspect delivery history.  
 将事件推送到 HTTP 接口，自动重试失败请求，并查看投递记录。
 
-[English](#english) · [中文](#中文)
+[English](#english) · [中文](#中文) · [Local retry walkthrough / 本地重试演示](docs/demo.md)
+
+The [public v1.0.0 release](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0) contains source code; the walkthrough runs locally with Docker Compose. Delivery is at least once, so receivers must deduplicate events.
+
+[公开的 v1.0.0 版本](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0)提供源码；演示需要在本地用 Docker Compose 运行。投递语义为至少一次，接收方需要处理重复事件。
 
 ## English
 
 Webhook Delivery Platform accepts events through an API and sends them to registered HTTP endpoints. Jobs are stored in PostgreSQL so a worker can pick them up after a restart. Each request is signed, and the React console shows the result of each delivery attempt.
 
 Built with Java 21, Spring Boot, PostgreSQL, and React. It uses a PostgreSQL queue with `FOR UPDATE SKIP LOCKED` leases to coordinate workers.
-
-### Features
-
-- **Delivery:** idempotent event acceptance, automatic retries with exponential backoff, dead-letter status, cancellation, and manual replay. Delivery is at-least-once, so receivers must deduplicate events by `X-Webhook-Id`.
-- **Endpoint management:** edit names and URLs, pause endpoints, and rotate signing secrets. Version checks detect conflicting updates. Existing jobs keep their original URL and secret snapshot.
-- **Request security:** HMAC-SHA256 signatures, encrypted signing secrets, and checks on destination URLs, addresses, ports, redirects, and response sizes. See the [security model](docs/security.md) for deployment requirements.
-- **Console and monitoring:** delivery history, live status updates through SSE, Prometheus metrics, and operator action logs. Status notifications and attempt metrics are emitted after the database transaction commits.
-- **Operator access:** one configured operator account, cookie sessions, CSRF protection, and login throttling.
-- **Local demo:** Docker Compose starts the app, database, and a receiver that verifies signatures and can simulate failed requests.
 
 ### Quick start
 
@@ -48,6 +43,16 @@ http://receiver:8090/hooks/flaky?failures=2
 
 The receiver returns HTTP `503` twice for each event and then succeeds. Use **Inspect** to review the committed attempt timeline. Runtime metrics include `/actuator/metrics/webhook.delivery.attempts`, `/actuator/metrics/webhook.delivery.duration`, and `/actuator/metrics/webhook.operator.authentication`.
 
+Expected retry sequence in the local walkthrough (not a live result from this README edit):
+
+```text
+Attempt 1: HTTP 503 → RETRY_SCHEDULED
+Attempt 2: HTTP 503 → RETRY_SCHEDULED
+Attempt 3: HTTP 204 → SUCCEEDED
+```
+
+A [successful retry demo CI run](https://github.com/TolkmisLK/webhook-delivery-platform/actions/runs/34197272344) ran the same script. The snippet above remains an expected result for a fresh local run; CI artifacts can expire.
+
 For a reproducible Prometheus view, start the optional observability profile:
 
 ```bash
@@ -57,6 +62,15 @@ docker compose --profile observability up --build
 Open [http://localhost:9090/targets](http://localhost:9090/targets) and query `webhook_delivery_jobs`, `webhook_delivery_oldest_runnable_age_seconds`, or `webhook_operator_authentication_total`. The Prometheus port is bound to `127.0.0.1`; the frontend proxies only health checks, not metrics. In production, keep all management endpoints on a private operations network.
 
 [Retry walkthrough and runnable example](docs/demo.md)
+
+### Features
+
+- **Delivery:** idempotent event acceptance, automatic retries with exponential backoff, dead-letter status, cancellation, and manual replay. Delivery is at-least-once, so receivers must deduplicate events by `X-Webhook-Id`.
+- **Endpoint management:** edit names and URLs, pause endpoints, and rotate signing secrets. Version checks detect conflicting updates. Existing jobs keep their original URL and secret snapshot.
+- **Request security:** HMAC-SHA256 signatures, encrypted signing secrets, and checks on destination URLs, addresses, ports, redirects, and response sizes. See the [security model](docs/security.md) for deployment requirements.
+- **Console and monitoring:** delivery history, live status updates through SSE, Prometheus metrics, and operator action logs. Status notifications and attempt metrics are emitted after the database transaction commits.
+- **Operator access:** one configured operator account, cookie sessions, CSRF protection, and login throttling.
+- **Local demo:** Docker Compose starts the app, database, and a receiver that verifies signatures and can simulate failed requests.
 
 ### Delivery contract
 
@@ -111,15 +125,6 @@ Webhook Delivery Platform 通过 API 接收事件，再发送到已注册的 HTT
 
 项目使用 Java 21、Spring Boot、PostgreSQL 和 React。队列直接使用 PostgreSQL，通过 `FOR UPDATE SKIP LOCKED` 和任务租约协调多个 Worker。
 
-### 主要功能
-
-- **事件投递：** 幂等接收、指数退避重试、死信状态、任务取消和手动重投。采用至少一次（at-least-once）投递语义，接收方需要按 `X-Webhook-Id` 去重。
-- **接收端管理：** 修改名称和地址、暂停接收端、轮换签名密钥。版本校验用于识别并发修改；已有任务继续使用创建时的地址和密钥快照。
-- **请求安全：** HMAC-SHA256 签名、签名密钥加密，以及目标 URL、地址、端口、重定向和响应大小检查。部署要求见[安全模型](docs/security.md)。
-- **控制台与监控：** 投递历史、SSE 实时状态、Prometheus 指标和人工操作日志。状态通知和尝试指标在数据库事务提交后发出。
-- **登录管理：** 一个预设操作者账号、Cookie 会话、CSRF 防护和登录限流。
-- **本地演示：** Docker Compose 启动应用、数据库和接收服务；接收服务支持验签和模拟请求失败。
-
 ### 快速开始
 
 环境要求：Docker 与 Docker Compose。
@@ -146,6 +151,8 @@ http://receiver:8090/hooks/flaky?failures=2
 
 Receiver 会针对每个事件先返回两次 HTTP `503`，随后成功。可通过“查看详情”查看每次请求的结果和耗时；运行时指标包括 `/actuator/metrics/webhook.delivery.attempts`、`/actuator/metrics/webhook.delivery.duration` 与 `/actuator/metrics/webhook.operator.authentication`。
 
+本地演示的预期顺序为 `503 → 503 → 204`，最终状态为 `SUCCEEDED`。这里展示的是[演示文档](docs/demo.md)中的预期结果；[一次成功的 Retry demo CI 运行](https://github.com/TolkmisLK/webhook-delivery-platform/actions/runs/34197272344)执行过相同脚本。CI 产物可能过期。
+
 如需查看 Prometheus 指标，可启用 Compose 的 `observability` 配置：
 
 ```bash
@@ -157,6 +164,15 @@ docker compose --profile observability up --build
 注册 Endpoint 并发布示例事件后，可以观察任务从 `PENDING` 进入 `SUCCEEDED`。
 
 [一步步运行重试演示](docs/demo.md)
+
+### 主要功能
+
+- **事件投递：** 幂等接收、指数退避重试、死信状态、任务取消和手动重投。采用至少一次（at-least-once）投递语义，接收方需要按 `X-Webhook-Id` 去重。
+- **接收端管理：** 修改名称和地址、暂停接收端、轮换签名密钥。版本校验用于识别并发修改；已有任务继续使用创建时的地址和密钥快照。
+- **请求安全：** HMAC-SHA256 签名、签名密钥加密，以及目标 URL、地址、端口、重定向和响应大小检查。部署要求见[安全模型](docs/security.md)。
+- **控制台与监控：** 投递历史、SSE 实时状态、Prometheus 指标和人工操作日志。状态通知和尝试指标在数据库事务提交后发出。
+- **登录管理：** 一个预设操作者账号、Cookie 会话、CSRF 防护和登录限流。
+- **本地演示：** Docker Compose 启动应用、数据库和接收服务；接收服务支持验签和模拟请求失败。
 
 ### 投递协议
 
