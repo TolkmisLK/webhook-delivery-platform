@@ -360,9 +360,9 @@ export function App() {
     event.preventDefault();
     if (!window.confirm(t.rotateSecretConfirm)) return;
     const newSecret = secretRotation.newSecret;
-    setSecretRotation({ endpointId: "", newSecret: "" });
     await run(async () => {
       await api.rotateEndpointSecret(endpoint.id, newSecret, endpoint.version);
+      setSecretRotation({ endpointId: "", newSecret: "" });
       setNotice(locale === "zh" ? "Endpoint 签名密钥已轮换。" : "Endpoint signing secret rotated.");
       await load();
     });
@@ -372,9 +372,9 @@ export function App() {
     event.preventDefault();
     if (!window.confirm(t.updateEndpointConfirm)) return;
     const { name, url } = endpointEdit;
-    setEndpointEdit({ endpointId: "", name: "", url: "" });
     await run(async () => {
       await api.updateEndpoint(endpoint.id, name, url, endpoint.version);
+      setEndpointEdit({ endpointId: "", name: "", url: "" });
       setNotice(locale === "zh" ? "Endpoint 配置已更新。" : "Endpoint configuration updated.");
       await load();
     });
