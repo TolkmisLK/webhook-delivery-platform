@@ -7,7 +7,7 @@ body:
     id: behavior
     attributes:
       label: Observed behavior / 实际行为
-      description: Include delivery state, status code, and sanitized logs.
+      description: Include delivery state, status code, and sanitized logs. / 请附投递状态、状态码和已脱敏日志。
     validations:
       required: true
   - type: textarea
@@ -20,7 +20,7 @@ body:
     id: reproduce
     attributes:
       label: Reproduction / 复现步骤
-      placeholder: "1. Register endpoint...\n2. Publish event..."
+      placeholder: "1. Register endpoint / 注册 Endpoint...\n2. Publish event / 发布事件..."
     validations:
       required: true
   - type: input

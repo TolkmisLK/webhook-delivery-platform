@@ -1,4 +1,4 @@
-# ADR-0001: PostgreSQL-backed delivery queue
+# ADR-0001: PostgreSQL-backed delivery queue / 基于 PostgreSQL 的投递队列
 
 - Status / 状态: Accepted / 已接受
 - Date / 日期: 2026-08-24
@@ -17,19 +17,26 @@ Store immutable events and delivery jobs in PostgreSQL. Workers claim batches wi
 
 ## Consequences / 影响
 
-Positive:
+Positive / 优点：
 
 - Event acceptance and job creation share one transaction.
+  事件接收与任务创建处于同一个事务；在返回成功前，两者一起持久化。
 - A single backup contains operational state.
+  一份数据库备份包含队列运行状态；恢复时仍需配套的主密钥和部署配置。
 - Multiple workers can claim jobs without a central coordinator.
+  多个 Worker 可在无需中心协调器的情况下抢占任务。
 - The complete system runs with one infrastructure dependency.
+  系统只需要 PostgreSQL 这一项基础设施依赖。
 
-Trade-offs:
+Trade-offs / 代价：
 
 - Polling adds bounded latency and database load.
+  轮询带来额外等待时间及数据库负载。
 - At-least-once delivery requires idempotent consumers.
+  至少一次投递要求接收方按事件 ID 去重，处理重复副作用。
 - Very high throughput may eventually justify a broker or log-based transport.
+  如果吞吐量显著提高，将来可能需要消息代理或基于日志的传输层。
 
 Revisit the decision only after benchmarks show PostgreSQL contention or polling cost outside the project target.
 
-优点是事务边界清晰、运维依赖少，并能支持多个 Worker。代价是轮询延迟、数据库负载和 at-least-once 语义。只有性能数据证明出现瓶颈时，才重新评估独立消息队列。
+只有基准测试证明 PostgreSQL 争用或轮询成本超出项目目标时，才重新评估这一决策。
