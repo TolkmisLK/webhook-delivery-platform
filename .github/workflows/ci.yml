@@ -55,6 +55,12 @@ jobs:
         working-directory: frontend
         run: npm run check
 
+      - name: Browser form regressions
+        working-directory: frontend
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright test
+
       - name: Lint OpenAPI contract
         run: npx --yes @redocly/cli@2.47.0 lint docs/openapi.yaml
 

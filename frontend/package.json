@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint . --max-warnings=0",
     "test": "vitest run",
+    "test:browser": "playwright test",
     "check": "npm run lint && npm run test && npm run build"
   },
   "dependencies": {
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
     "@types/node": "24.10.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
