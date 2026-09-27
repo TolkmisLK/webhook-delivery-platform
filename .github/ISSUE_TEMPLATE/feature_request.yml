@@ -7,7 +7,7 @@ body:
     id: problem
     attributes:
       label: Problem / 问题
-      description: Describe the operational need before proposing implementation.
+      description: Describe the operational need before proposing implementation. / 请先说明实际使用需求，再提出实现方案。
     validations:
       required: true
   - type: textarea

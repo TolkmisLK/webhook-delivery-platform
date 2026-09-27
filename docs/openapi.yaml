@@ -12,6 +12,8 @@ info:
     Clients may send `X-Request-Id` on any request. Every response echoes the
     effective identifier; unsafe or missing values are replaced with a UUID.
     The 1.x compatibility policy is documented in `docs/api-compatibility.md`.
+    客户端可在任意请求中发送 `X-Request-Id`。每个响应都会回传实际使用的标识；
+    如果缺失或不安全，则由服务端生成 UUID。1.x 兼容政策见 `docs/api-compatibility.md`。
 servers:
   - url: /
 security:
@@ -26,7 +28,7 @@ paths:
       security: []
       responses:
         "200":
-          description: The current session-bound CSRF token and required request header.
+          description: The current session-bound CSRF token and required request header. / 当前会话绑定的 CSRF Token 及应使用的请求 Header。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -51,7 +53,7 @@ paths:
               $ref: "#/components/schemas/LoginRequest"
       responses:
         "200":
-          description: Credentials accepted and the session identifier rotated.
+          description: Credentials accepted and the session identifier rotated. / 凭据通过校验，会话标识已轮换。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -73,7 +75,7 @@ paths:
       summary: Inspect the current operator session / 查询当前操作者会话
       responses:
         "200":
-          description: Authenticated operator identity.
+          description: Authenticated operator identity. / 已认证的操作者身份。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -93,7 +95,7 @@ paths:
         - $ref: "#/components/parameters/CsrfHeader"
       responses:
         "204":
-          description: Session invalidated and authentication cookies cleared.
+          description: Session invalidated and authentication cookies cleared. / 会话已失效，认证 Cookie 已清除。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -109,7 +111,7 @@ paths:
       summary: List registered endpoints / 查询 Endpoint
       responses:
         "200":
-          description: Registered endpoints ordered by creation time.
+          description: Registered endpoints ordered by creation time. / 按创建时间排序的已注册 Endpoint。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -134,7 +136,7 @@ paths:
               $ref: "#/components/schemas/CreateEndpoint"
       responses:
         "201":
-          description: Endpoint created. The signing secret is not returned.
+          description: Endpoint created. The signing secret is not returned. / Endpoint 已创建；响应不返回签名密钥。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -157,6 +159,8 @@ paths:
       description: |
         Replaces the live Endpoint name and normalized target URL.
         Deliveries accepted before this update retain their immutable target snapshot.
+        替换当前 Endpoint 名称和规范化后的目标 URL。
+        更新前已接收的投递仍保留原有不可变目标快照。
       parameters:
         - $ref: "#/components/parameters/EndpointId"
         - $ref: "#/components/parameters/CsrfHeader"
@@ -168,7 +172,7 @@ paths:
               $ref: "#/components/schemas/UpdateEndpoint"
       responses:
         "200":
-          description: Endpoint updated or already equal after normalization.
+          description: Endpoint updated or already equal after normalization. / Endpoint 已更新，或规范化后与原值相同。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -203,7 +207,7 @@ paths:
               $ref: "#/components/schemas/SetEndpointStatus"
       responses:
         "200":
-          description: Endpoint status updated or already in the requested state.
+          description: Endpoint status updated or already in the requested state. / Endpoint 状态已更新，或本来就是请求的状态。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -230,6 +234,8 @@ paths:
       description: |
         Replaces the encrypted signing secret for deliveries accepted after this update.
         Deliveries accepted before rotation retain their immutable secret snapshot.
+        对轮换后接收的投递使用新的加密签名密钥。
+        轮换前已接收的投递仍保留原有不可变密钥快照。
       parameters:
         - $ref: "#/components/parameters/EndpointId"
         - $ref: "#/components/parameters/CsrfHeader"
@@ -241,7 +247,7 @@ paths:
               $ref: "#/components/schemas/RotateEndpointSecret"
       responses:
         "200":
-          description: Secret rotated. No secret material is returned.
+          description: Secret rotated. No secret material is returned. / 密钥已轮换；响应不返回密钥材料。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -275,7 +281,7 @@ paths:
               $ref: "#/components/schemas/PublishEvent"
       responses:
         "202":
-          description: Existing idempotent result or newly persisted delivery job.
+          description: Existing idempotent result or newly persisted delivery job. / 返回已有的幂等结果，或新持久化的投递任务。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -307,7 +313,7 @@ paths:
             default: 50
       responses:
         "200":
-          description: Recent delivery jobs.
+          description: Recent delivery jobs. / 最近的投递任务。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -327,7 +333,7 @@ paths:
       summary: Delivery counts by state / 按状态统计投递
       responses:
         "200":
-          description: Delivery counts.
+          description: Delivery counts. / 各投递状态的任务数量。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -347,7 +353,7 @@ paths:
         - $ref: "#/components/parameters/DeliveryId"
       responses:
         "200":
-          description: Delivery job and its committed attempt timeline.
+          description: Delivery job and its committed attempt timeline. / 投递任务及已提交的尝试时间线。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -370,7 +376,7 @@ paths:
         - $ref: "#/components/parameters/CsrfHeader"
       responses:
         "200":
-          description: Delivery returned to PENDING with an extended attempt budget.
+          description: Delivery returned to PENDING with an extended attempt budget. / 任务回到 PENDING，尝试次数上限已扩展。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -397,7 +403,7 @@ paths:
         - $ref: "#/components/parameters/CsrfHeader"
       responses:
         "200":
-          description: Delivery is CANCELED; repeating the request is idempotent.
+          description: Delivery is CANCELED; repeating the request is idempotent. / 任务进入 CANCELED；重复请求具有幂等性。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -424,6 +430,8 @@ paths:
           description: |
             Server-sent events named `connected` or `delivery`. The JSON value
             in each `data` field conforms to the documented event-data schema.
+            SSE 事件名为 `connected` 或 `delivery`；每个 `data` 字段中的 JSON 值
+            符合下方记录的事件数据 Schema。
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -431,7 +439,7 @@ paths:
             text/event-stream:
               schema:
                 type: string
-                description: UTF-8 SSE frames whose `data` value is JSON.
+                description: UTF-8 SSE frames whose `data` value is JSON. / UTF-8 SSE 帧，其中 `data` 为 JSON 值。
                 x-event-data-schema:
                   type: object
                   required: [deliveryId, status, occurredAt]
@@ -439,7 +447,7 @@ paths:
                     deliveryId:
                       type: [string, "null"]
                       format: uuid
-                      description: Null for the initial `connected` event.
+                      description: Null for the initial `connected` event. / 首次 `connected` 事件中为 null。
                     status:
                       type: string
                       enum:
@@ -465,6 +473,8 @@ components:
         Caller-supplied correlation identifier. Values must contain only ASCII
         letters, digits, `.`, `_`, `:`, or `-`; unsafe or missing values are
         replaced with a UUID and the effective value is returned in every response.
+        调用方提供的关联标识只能包含 ASCII 字母、数字、`.`、`_`、`:` 或 `-`；
+        如果缺失或不安全，则替换为 UUID，并在每个响应中返回实际使用的值。
       schema:
         type: string
         minLength: 1
@@ -474,7 +484,7 @@ components:
       name: X-CSRF-TOKEN
       in: header
       required: true
-      description: Session-bound token obtained from `GET /api/auth/csrf`.
+      description: Session-bound token obtained from `GET /api/auth/csrf`. / 从 `GET /api/auth/csrf` 获取的会话绑定 Token。
       schema:
         type: string
     EndpointId:
@@ -493,7 +503,7 @@ components:
         format: uuid
   headers:
     RequestId:
-      description: Effective request correlation identifier.
+      description: Effective request correlation identifier. / 实际使用的请求关联标识。
       schema:
         type: string
         minLength: 1
@@ -501,7 +511,7 @@ components:
         pattern: "^[A-Za-z0-9._:-]+$"
   responses:
     Unauthenticated:
-      description: No valid operator session. Error code is `unauthenticated`.
+      description: No valid operator session. Error code is `unauthenticated`. / 无有效操作者会话；错误码为 `unauthenticated`。
       headers:
         X-Request-Id:
           $ref: "#/components/headers/RequestId"
@@ -510,7 +520,7 @@ components:
           schema:
             $ref: "#/components/schemas/ApiError"
     InvalidCredentials:
-      description: The supplied credentials are invalid. Error code is `invalid_credentials`.
+      description: The supplied credentials are invalid. Error code is `invalid_credentials`. / 提供的凭据无效；错误码为 `invalid_credentials`。
       headers:
         X-Request-Id:
           $ref: "#/components/headers/RequestId"
@@ -519,7 +529,7 @@ components:
           schema:
             $ref: "#/components/schemas/ApiError"
     AccessDenied:
-      description: CSRF validation or authorization failed. Error code is `access_denied`.
+      description: CSRF validation or authorization failed. Error code is `access_denied`. / CSRF 校验或授权失败；错误码为 `access_denied`。
       headers:
         X-Request-Id:
           $ref: "#/components/headers/RequestId"
@@ -528,12 +538,12 @@ components:
           schema:
             $ref: "#/components/schemas/ApiError"
     LoginRateLimited:
-      description: Login quota exceeded. Error code is `login_rate_limited`.
+      description: Login quota exceeded. Error code is `login_rate_limited`. / 登录次数超出配额；错误码为 `login_rate_limited`。
       headers:
         X-Request-Id:
           $ref: "#/components/headers/RequestId"
         Retry-After:
-          description: Seconds until the rejected quota can be attempted again.
+          description: Seconds until the rejected quota can be attempted again. / 被拒绝的登录配额恢复前需要等待的秒数。
           schema:
             type: integer
             minimum: 1
@@ -542,7 +552,7 @@ components:
           schema:
             $ref: "#/components/schemas/ApiError"
     BadRequest:
-      description: Invalid request.
+      description: Invalid request. / 请求无效。
       headers:
         X-Request-Id:
           $ref: "#/components/headers/RequestId"
@@ -551,7 +561,7 @@ components:
           schema:
             $ref: "#/components/schemas/ApiError"
     NotFound:
-      description: Resource not found.
+      description: Resource not found. / 资源不存在。
       headers:
         X-Request-Id:
           $ref: "#/components/headers/RequestId"
@@ -560,7 +570,7 @@ components:
           schema:
             $ref: "#/components/schemas/ApiError"
     VersionConflict:
-      description: The endpoint version is stale and must be refreshed.
+      description: The endpoint version is stale and must be refreshed. / Endpoint 版本已过期，必须刷新后重试。
       headers:
         X-Request-Id:
           $ref: "#/components/headers/RequestId"
@@ -569,7 +579,7 @@ components:
           schema:
             $ref: "#/components/schemas/ApiError"
     DeliveryStateConflict:
-      description: The delivery is no longer queued and cannot be canceled.
+      description: The delivery is no longer queued and cannot be canceled. / 投递已不在排队状态，无法取消。
       headers:
         X-Request-Id:
           $ref: "#/components/headers/RequestId"
@@ -765,4 +775,4 @@ components:
           type: string
           minLength: 1
           maxLength: 100
-          description: Matches the effective `X-Request-Id` response header.
+          description: Matches the effective `X-Request-Id` response header. / 与响应 Header 中实际使用的 `X-Request-Id` 相同。

@@ -24,6 +24,8 @@ cp .env.example .env
 docker compose up --build
 ```
 
+In Windows PowerShell, replace `cp .env.example .env` with `Copy-Item .env.example .env`. The example master key and Compose credentials are for the local demo only. Before any other deployment, provide new secrets and follow the [production checklist](docs/production-readiness.md).
+
 Open [http://localhost:8088](http://localhost:8088).
 
 Sign in with the development-only Compose defaults: `admin` / `local-admin-password`. Override `APP_OPERATOR_USERNAME` and `APP_OPERATOR_PASSWORD` through `.env` for any non-local deployment. When the public origin uses HTTPS, also set `APP_OPERATOR_COOKIE_SECURE=true`.
@@ -133,6 +135,8 @@ Webhook Delivery Platform 通过 API 接收事件，再发送到已注册的 HTT
 cp .env.example .env
 docker compose up --build
 ```
+
+Windows PowerShell 请将复制命令改为 `Copy-Item .env.example .env`。示例主密钥和 Compose 登录凭据仅供本地演示；在其他环境部署前必须更换，并完成[生产部署检查表](docs/production-readiness.md)。
 
 访问 [http://localhost:8088](http://localhost:8088)。
 
