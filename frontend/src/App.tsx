@@ -211,6 +211,9 @@ export function App() {
     if (cause instanceof ApiRequestError && cause.status === 401) {
       api.resetSessionState();
       setAuth({ status: "signed-out" });
+      setEndpointEdit({ endpointId: "", name: "", url: "" });
+      setSecretRotation({ endpointId: "", newSecret: "" });
+      setEndpointForm((current) => ({ ...current, secret: "" }));
       setStreamConnected(false);
       return;
     }
@@ -315,6 +318,9 @@ export function App() {
     try {
       await api.logout();
       setAuth({ status: "signed-out" });
+      setEndpointEdit({ endpointId: "", name: "", url: "" });
+      setSecretRotation({ endpointId: "", newSecret: "" });
+      setEndpointForm((current) => ({ ...current, secret: "" }));
       setEndpoints([]);
       setDeliveries([]);
       setStats(emptyStats);
@@ -360,9 +366,9 @@ export function App() {
     event.preventDefault();
     if (!window.confirm(t.rotateSecretConfirm)) return;
     const newSecret = secretRotation.newSecret;
-    setSecretRotation({ endpointId: "", newSecret: "" });
     await run(async () => {
       await api.rotateEndpointSecret(endpoint.id, newSecret, endpoint.version);
+      setSecretRotation({ endpointId: "", newSecret: "" });
       setNotice(locale === "zh" ? "Endpoint 签名密钥已轮换。" : "Endpoint signing secret rotated.");
       await load();
     });
@@ -372,9 +378,9 @@ export function App() {
     event.preventDefault();
     if (!window.confirm(t.updateEndpointConfirm)) return;
     const { name, url } = endpointEdit;
-    setEndpointEdit({ endpointId: "", name: "", url: "" });
     await run(async () => {
       await api.updateEndpoint(endpoint.id, name, url, endpoint.version);
+      setEndpointEdit({ endpointId: "", name: "", url: "" });
       setNotice(locale === "zh" ? "Endpoint 配置已更新。" : "Endpoint configuration updated.");
       await load();
     });
@@ -563,13 +569,13 @@ export function App() {
                 </div>
                 {endpointEdit.endpointId === endpoint.id && (
                   <form className="endpoint-edit-form" onSubmit={(event) => void updateEndpoint(event, endpoint)}>
-                    <label>{t.name}<input autoFocus required maxLength={120} value={endpointEdit.name} onChange={(event) => setEndpointEdit({ ...endpointEdit, name: event.target.value })} /></label>
-                    <label>{t.targetUrl}<input required type="url" maxLength={2048} value={endpointEdit.url} onChange={(event) => setEndpointEdit({ ...endpointEdit, url: event.target.value })} /></label>
+                    <label>{t.name}<input autoFocus disabled={busy} required maxLength={120} value={endpointEdit.name} onChange={(event) => setEndpointEdit({ ...endpointEdit, name: event.target.value })} /></label>
+                    <label>{t.targetUrl}<input disabled={busy} required type="url" maxLength={2048} value={endpointEdit.url} onChange={(event) => setEndpointEdit({ ...endpointEdit, url: event.target.value })} /></label>
                     <p>{t.editEndpointHelp}</p>
                     <span className="configuration-actions"><button className="primary-button" disabled={busy} type="submit">{t.saveChanges}</button><button className="ghost-button" disabled={busy} type="button" onClick={() => setEndpointEdit({ endpointId: "", name: "", url: "" })}>{t.cancelRotation}</button></span>
                   </form>
                 )}
-                {secretRotation.endpointId === endpoint.id && <form className="secret-rotation-form" onSubmit={(event) => void rotateEndpointSecret(event, endpoint)}><label>{t.newSigningSecret}<input autoFocus required minLength={16} maxLength={512} type="password" autoComplete="new-password" value={secretRotation.newSecret} onChange={(event) => setSecretRotation({ endpointId: endpoint.id, newSecret: event.target.value })} /></label><p>{t.rotateSecretHelp}</p><span className="rotation-actions"><button className="primary-button" disabled={busy} type="submit">{t.confirmRotation}</button><button className="ghost-button" disabled={busy} type="button" onClick={() => setSecretRotation({ endpointId: "", newSecret: "" })}>{t.cancelRotation}</button></span></form>}
+                {secretRotation.endpointId === endpoint.id && <form className="secret-rotation-form" onSubmit={(event) => void rotateEndpointSecret(event, endpoint)}><label>{t.newSigningSecret}<input autoFocus disabled={busy} required minLength={16} maxLength={512} type="password" autoComplete="new-password" value={secretRotation.newSecret} onChange={(event) => setSecretRotation({ endpointId: endpoint.id, newSecret: event.target.value })} /></label><p>{t.rotateSecretHelp}</p><span className="rotation-actions"><button className="primary-button" disabled={busy} type="submit">{t.confirmRotation}</button><button className="ghost-button" disabled={busy} type="button" onClick={() => setSecretRotation({ endpointId: "", newSecret: "" })}>{t.cancelRotation}</button></span></form>}
               </li>
             ))}</ul>
           )}

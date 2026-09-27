@@ -8,6 +8,8 @@ backend/target/
 frontend/node_modules/
 frontend/dist/
 frontend/tsconfig.tsbuildinfo
+frontend/test-results/
+frontend/playwright-report/
 
 .tooling/
 .npm-cache/
