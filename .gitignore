@@ -16,3 +16,4 @@ frontend/playwright-report/
 
 *.log
 coverage/
+drill-summary.json
