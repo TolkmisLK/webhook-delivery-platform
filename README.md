@@ -65,6 +65,8 @@ Open [http://localhost:9090/targets](http://localhost:9090/targets) and query `w
 
 [Retry walkthrough and runnable example](docs/demo.md)
 
+The [controlled small-batch and recovery drill](docs/controlled-drill.md) records actual delivery attempts from an isolated CI Compose stack after a receiver outage and a normal backend restart. Its JSON artifact is evidence for that run, not a throughput benchmark.
+
 ### Features
 
 - **Delivery:** idempotent event acceptance, automatic retries with exponential backoff, dead-letter status, cancellation, and manual replay. Delivery is at-least-once, so receivers must deduplicate events by `X-Webhook-Id`.
@@ -110,6 +112,7 @@ The backend checks also verify Java formatting and the Spring Modulith dependenc
 - [OpenAPI contract](docs/openapi.yaml)
 - [API compatibility policy](docs/api-compatibility.md)
 - [Upgrade, backup, and recovery](docs/operations-recovery.md)
+- [Controlled load and recovery drill](docs/controlled-drill.md)
 - [v1.0 production readiness](docs/production-readiness.md)
 - [ADR-0001: PostgreSQL-backed delivery queue](docs/adr/0001-postgresql-delivery-queue.md)
 - [Contributing](CONTRIBUTING.md)
@@ -168,6 +171,8 @@ docker compose --profile observability up --build
 注册 Endpoint 并发布示例事件后，可以观察任务从 `PENDING` 进入 `SUCCEEDED`。
 
 [一步步运行重试演示](docs/demo.md)
+
+[受控小批量与故障恢复演练](docs/controlled-drill.md)在独立 CI Compose 栈中记录接收端短时不可用及后端正常重启前后的真实投递尝试，并输出逐条 JSON 证据；它不是吞吐量基准测试。
 
 ### 主要功能
 

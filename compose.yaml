@@ -51,7 +51,9 @@ services:
       APP_OPERATOR_LOGIN_GLOBAL_BLOCK_DURATION: ${APP_OPERATOR_LOGIN_GLOBAL_BLOCK_DURATION:-1m}
       APP_OPERATOR_LOGIN_MAX_CLIENT_ENTRIES: ${APP_OPERATOR_LOGIN_MAX_CLIENT_ENTRIES:-1024}
       APP_DELIVERY_WORKER_ID: docker-worker-1
-      APP_DELIVERY_WORKER_CONCURRENCY: 4
+      APP_DELIVERY_WORKER_CONCURRENCY: ${APP_DELIVERY_WORKER_CONCURRENCY:-4}
+      APP_DELIVERY_BATCH_SIZE: ${APP_DELIVERY_BATCH_SIZE:-10}
+      APP_DELIVERY_MAX_ATTEMPTS: ${APP_DELIVERY_MAX_ATTEMPTS:-5}
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,7 +69,7 @@ services:
     build:
       context: ./frontend
     ports:
-      - "8088:80"
+      - "127.0.0.1:8088:80"
     depends_on:
       backend:
         condition: service_healthy

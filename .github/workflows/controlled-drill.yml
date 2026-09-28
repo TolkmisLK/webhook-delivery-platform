@@ -1,0 +1,72 @@
+name: Controlled load and recovery drill
+
+on:
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: Events in each of the two phases (1 to 5)
+        required: false
+        default: '3'
+  pull_request:
+    paths:
+      - 'scripts/controlled-drill.mjs'
+      - 'scripts/controlled-drill.test.mjs'
+      - 'scripts/demo-client.mjs'
+      - 'scripts/demo-retry.mjs'
+      - 'compose.yaml'
+      - '.github/workflows/controlled-drill.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/controlled-drill.mjs'
+      - 'scripts/controlled-drill.test.mjs'
+      - 'scripts/demo-client.mjs'
+      - 'scripts/demo-retry.mjs'
+      - 'compose.yaml'
+      - '.github/workflows/controlled-drill.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: controlled-drill-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      COMPOSE_PROJECT_NAME: webhook-drill-${{ github.run_id }}-${{ github.run_attempt }}
+      DEMO_BASE_URL: http://127.0.0.1:8088
+      DRILL_BATCH_SIZE: ${{ inputs.batch_size || '3' }}
+      APP_DELIVERY_WORKER_CONCURRENCY: '2'
+      APP_DELIVERY_BATCH_SIZE: '2'
+      APP_DELIVERY_MAX_ATTEMPTS: '5'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Validate drill limits and evidence checks
+        run: node --test scripts/controlled-drill.test.mjs
+      - name: Start isolated loopback Compose stack
+        run: |
+          cp .env.example .env
+          docker compose -p "$COMPOSE_PROJECT_NAME" up --build --wait --wait-timeout 180
+      - name: Run controlled baseline, outage and recovery
+        run: node --env-file=.env scripts/controlled-drill.mjs
+      - name: Show scoped service health on failure
+        if: failure()
+        run: docker compose -p "$COMPOSE_PROJECT_NAME" ps -a
+      - name: Upload measured JSON summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: controlled-drill-summary
+          path: drill-summary.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Remove only this run's stack and volumes
+        if: always()
+        run: docker compose -p "$COMPOSE_PROJECT_NAME" down --volumes
