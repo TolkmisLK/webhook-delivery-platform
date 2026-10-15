@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { StatusBadge } from "./components/StatusBadge";
 import { api, ApiRequestError } from "./lib/api";
-import type { Delivery, DeliveryDetail, DeliveryStats, Endpoint } from "./lib/types";
+import type { Delivery, DeliveryDetail, DeliveryStats, DeliveryStatus, Endpoint } from "./lib/types";
 import {
   canCancelDelivery,
   formatDuration,
@@ -11,6 +11,9 @@ import {
 } from "./lib/view";
 
 type Locale = "en" | "zh";
+const deliveryStatuses: DeliveryStatus[] = ["PENDING", "PROCESSING", "RETRY_SCHEDULED", "SUCCEEDED", "DEAD", "CANCELED"];
+const pageSize = 25;
+const maxDeliveryPage = 10_000;
 type AuthState =
   | { status: "checking" }
   | { status: "signed-out" }
@@ -49,6 +52,17 @@ const copy = {
     eventData: "Event data",
     publish: "Publish event",
     recentTitle: "Recent deliveries",
+    filterStatus: "Status filter",
+    filterEndpoint: "Endpoint filter",
+    allStatuses: "All statuses",
+    allEndpoints: "All endpoints",
+    previousPage: "Previous",
+    nextPage: "Next",
+    page: "Page",
+    loadingDeliveries: "Loading deliveries…",
+    noMatches: "No deliveries match these filters.",
+    pageLimitReached: "Page limit reached. Narrow the filters to continue browsing.",
+    statusNames: { PENDING: "Pending", PROCESSING: "Processing", RETRY_SCHEDULED: "Retry scheduled", SUCCEEDED: "Succeeded", DEAD: "Dead", CANCELED: "Canceled" },
     refresh: "Refresh",
     empty: "No deliveries yet. Register an endpoint and publish the first event.",
     target: "Target",
@@ -120,6 +134,17 @@ const copy = {
     eventData: "事件数据",
     publish: "发布事件",
     recentTitle: "最近推送",
+    filterStatus: "状态筛选",
+    filterEndpoint: "接收地址筛选",
+    allStatuses: "全部状态",
+    allEndpoints: "全部接收地址",
+    previousPage: "上一页",
+    nextPage: "下一页",
+    page: "第",
+    loadingDeliveries: "正在加载推送记录…",
+    noMatches: "没有符合筛选条件的推送记录。",
+    pageLimitReached: "已达到页码上限。请缩小筛选范围继续查找。",
+    statusNames: { PENDING: "待处理", PROCESSING: "处理中", RETRY_SCHEDULED: "等待重试", SUCCEEDED: "成功", DEAD: "死信", CANCELED: "已取消" },
     refresh: "刷新",
     empty: "暂无推送记录。请先注册 Endpoint，再发布第一个事件。",
     target: "目标",
@@ -185,6 +210,13 @@ export function App() {
   const [auth, setAuth] = useState<AuthState>({ status: "checking" });
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus | "">("");
+  const [deliveryEndpoint, setDeliveryEndpoint] = useState("");
+  const [deliveryPage, setDeliveryPage] = useState(0);
+  const [deliveryHasNext, setDeliveryHasNext] = useState(false);
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
+  const loadSequence = useRef(0);
+  const detailSequence = useRef(0);
   const [stats, setStats] = useState<DeliveryStats>(emptyStats);
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -209,6 +241,8 @@ export function App() {
 
   const handleError = useCallback((cause: unknown) => {
     if (cause instanceof ApiRequestError && cause.status === 401) {
+      loadSequence.current += 1;
+      detailSequence.current += 1;
       api.resetSessionState();
       setAuth({ status: "signed-out" });
       setEndpointEdit({ endpointId: "", name: "", url: "" });
@@ -221,14 +255,23 @@ export function App() {
   }, []);
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
+    setDeliveryLoading(true);
     try {
       const [nextEndpoints, nextDeliveries, nextStats] = await Promise.all([
         api.listEndpoints(),
-        api.listDeliveries(),
+        api.listDeliveryPage({
+          endpointId: deliveryEndpoint || undefined,
+          status: deliveryStatus || undefined,
+          page: deliveryPage,
+          size: pageSize,
+        }),
         api.getStats(),
       ]);
+      if (sequence !== loadSequence.current) return;
       setEndpoints(nextEndpoints);
-      setDeliveries(nextDeliveries);
+      setDeliveries(nextDeliveries.items);
+      setDeliveryHasNext(nextDeliveries.hasNext);
       setStats(nextStats);
       setEventForm((current) => ({
         ...current,
@@ -236,9 +279,14 @@ export function App() {
       }));
       setError(null);
     } catch (loadError) {
-      handleError(loadError);
+      if (sequence === loadSequence.current) handleError(loadError);
+    } finally {
+      if (sequence === loadSequence.current) setDeliveryLoading(false);
     }
-  }, [handleError]);
+  }, [deliveryEndpoint, deliveryPage, deliveryStatus, handleError]);
+
+  const loadRef = useRef(load);
+  loadRef.current = load;
 
   useEffect(() => {
     let active = true;
@@ -265,15 +313,22 @@ export function App() {
   useEffect(() => {
     if (auth.status !== "signed-in") return;
     void load();
+  }, [auth.status, load]);
+
+  useEffect(() => {
+    if (auth.status !== "signed-in") return;
     const stream = new EventSource("/api/deliveries/stream");
     stream.onopen = () => setStreamConnected(true);
-    stream.addEventListener("delivery", () => void load());
+    stream.addEventListener("delivery", () => void loadRef.current());
     stream.onerror = () => {
       setStreamConnected(false);
       void api.getSession().catch(handleError);
     };
-    return () => stream.close();
-  }, [auth.status, handleError, load]);
+    return () => {
+      loadSequence.current += 1;
+      stream.close();
+    };
+  }, [auth.status, handleError]);
 
   const statCards = useMemo(
     () => [
@@ -324,6 +379,7 @@ export function App() {
       setEndpoints([]);
       setDeliveries([]);
       setStats(emptyStats);
+      detailSequence.current += 1;
       setSelectedDelivery(null);
       setStreamConnected(false);
     } catch (logoutError) {
@@ -404,8 +460,10 @@ export function App() {
   }
 
   async function inspect(id: string) {
+    const sequence = ++detailSequence.current;
     await run(async () => {
-      setSelectedDelivery(await api.getDelivery(id));
+      const detail = await api.getDelivery(id);
+      if (sequence === detailSequence.current) setSelectedDelivery(detail);
     });
   }
 
@@ -516,11 +574,21 @@ export function App() {
 
         <section className="panel table-panel">
           <div className="table-heading"><div><p className="section-index">03</p><h2>{t.recentTitle}</h2></div><button className="ghost-button" type="button" onClick={() => void load()}>{t.refresh}</button></div>
-          {deliveries.length === 0 ? <p className="empty-state">{t.empty}</p> : (
+          <div className="delivery-filters">
+            <label>{t.filterStatus}<select value={deliveryStatus} onChange={(event) => { loadSequence.current += 1; detailSequence.current += 1; setDeliveryLoading(true); setDeliveries([]); setDeliveryHasNext(false); setSelectedDelivery(null); setDeliveryPage(0); setDeliveryStatus(event.target.value as DeliveryStatus | ""); }}><option value="">{t.allStatuses}</option>{deliveryStatuses.map((status) => <option value={status} key={status}>{t.statusNames[status]}</option>)}</select></label>
+            <label>{t.filterEndpoint}<select value={deliveryEndpoint} onChange={(event) => { loadSequence.current += 1; detailSequence.current += 1; setDeliveryLoading(true); setDeliveries([]); setDeliveryHasNext(false); setSelectedDelivery(null); setDeliveryPage(0); setDeliveryEndpoint(event.target.value); }}><option value="">{t.allEndpoints}</option>{endpoints.map((endpoint) => <option value={endpoint.id} key={endpoint.id}>{endpoint.name}</option>)}</select></label>
+          </div>
+          {deliveryLoading ? <p className="empty-state" role="status">{t.loadingDeliveries}</p> : deliveries.length === 0 ? <p className="empty-state">{deliveryPage > 0 || deliveryStatus || deliveryEndpoint ? t.noMatches : t.empty}</p> : (
             <div className="table-wrap"><table><thead><tr><th>Event</th><th>{t.target}</th><th>Status</th><th>{t.attempts}</th><th>{t.response}</th><th>{t.updated}</th><th>{t.action}</th></tr></thead>
               <tbody>{deliveries.map((delivery) => <tr key={delivery.id}><td><strong>{delivery.eventType}</strong><code>{delivery.eventId.slice(0, 8)}</code></td><td><strong>{delivery.endpointName}</strong><small title={delivery.endpointUrl}>{delivery.endpointUrl}</small></td><td><StatusBadge status={delivery.status} /></td><td>{delivery.attemptCount} / {delivery.maxAttempts}</td><td>{delivery.lastStatusCode ?? delivery.lastError ?? "—"}</td><td>{formatTimestamp(delivery.updatedAt, locale)}</td><td><div className="row-actions"><button className="text-button" disabled={busy} type="button" onClick={() => void inspect(delivery.id)}>{t.inspect}</button><button className="text-button" disabled={busy || delivery.status === "PROCESSING"} type="button" onClick={() => void replay(delivery.id)}>{t.replay}</button>{canCancelDelivery(delivery.status) && <button className="text-button danger-action" disabled={busy} type="button" onClick={() => void cancelDelivery(delivery.id)}>{t.cancelDelivery}</button>}</div></td></tr>)}</tbody>
             </table></div>
           )}
+          <div className="delivery-pagination">
+            <button className="ghost-button" type="button" disabled={deliveryLoading || deliveryPage === 0} onClick={() => { loadSequence.current += 1; detailSequence.current += 1; setDeliveryLoading(true); setDeliveries([]); setDeliveryHasNext(false); setSelectedDelivery(null); setDeliveryPage((current) => current - 1); }}>{t.previousPage}</button>
+            <span>{locale === "zh" ? `第 ${deliveryPage + 1} 页` : `${t.page} ${deliveryPage + 1}`}</span>
+            <button className="ghost-button" type="button" disabled={deliveryLoading || !deliveryHasNext || deliveryPage >= maxDeliveryPage} onClick={() => { loadSequence.current += 1; detailSequence.current += 1; setDeliveryLoading(true); setDeliveries([]); setDeliveryHasNext(false); setSelectedDelivery(null); setDeliveryPage((current) => Math.min(current + 1, maxDeliveryPage)); }}>{t.nextPage}</button>
+          </div>
+          {deliveryPage >= maxDeliveryPage && deliveryHasNext && <p className="delivery-page-limit">{t.pageLimitReached}</p>}
           {selectedDelivery && (
             <section className="attempt-detail" aria-labelledby="attempt-detail-title">
               <div className="attempt-detail-heading">
@@ -529,7 +597,7 @@ export function App() {
                   <h3 id="attempt-detail-title">{t.historyTitle}</h3>
                   <p>{t.historyHelp}</p>
                 </div>
-                <button className="ghost-button" type="button" onClick={() => setSelectedDelivery(null)}>{t.close}</button>
+                <button className="ghost-button" type="button" onClick={() => { detailSequence.current += 1; setSelectedDelivery(null); }}>{t.close}</button>
               </div>
               {selectedDelivery.attempts.length === 0 ? <p className="empty-state">{t.noAttempts}</p> : (
                 <ol className="attempt-timeline">

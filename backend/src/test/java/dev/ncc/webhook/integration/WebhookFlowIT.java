@@ -846,6 +846,127 @@ class WebhookFlowIT {
     throw new AssertionError("Delivery did not succeed before timeout");
   }
 
+  @Test
+  void pagesFilteredDeliveryHistoryWithDatabaseBounds() throws Exception {
+    UUID endpointId = createHistoryEndpoint("history-primary");
+    UUID otherEndpointId = createHistoryEndpoint("history-other");
+    Instant base = Instant.parse("2026-10-15T00:00:00Z");
+    UUID oldest = insertDelivery(endpointId, "DEAD", base.plusSeconds(300));
+    UUID middle = insertDelivery(endpointId, "DEAD", base.plusSeconds(300));
+    UUID newest = insertDelivery(endpointId, "DEAD", base.plusSeconds(300));
+    insertDelivery(endpointId, "SUCCEEDED", base.plusSeconds(300));
+    insertDelivery(otherEndpointId, "DEAD", base.plusSeconds(300));
+    jdbcTemplate.update(
+        "update delivery_job set created_at = ? where id = ?", Timestamp.from(base), oldest);
+    jdbcTemplate.update(
+        "update delivery_job set created_at = ? where id = ?",
+        Timestamp.from(base.plusSeconds(1)),
+        middle);
+    jdbcTemplate.update(
+        "update delivery_job set created_at = ? where id = ?",
+        Timestamp.from(base.plusSeconds(2)),
+        newest);
+
+    var first =
+        jsonMapper.readTree(
+            mockMvc
+                .perform(
+                    get("/api/deliveries/page")
+                        .param("endpointId", endpointId.toString())
+                        .param("status", "DEAD")
+                        .param("page", "0")
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+    assertThat(first.get("items").size()).isEqualTo(2);
+    assertThat(first.get("items").get(0).get("id").asText()).isEqualTo(newest.toString());
+    assertThat(first.get("items").get(1).get("id").asText()).isEqualTo(middle.toString());
+    assertThat(first.get("hasNext").asBoolean()).isTrue();
+
+    var second =
+        jsonMapper.readTree(
+            mockMvc
+                .perform(
+                    get("/api/deliveries/page")
+                        .param("endpointId", endpointId.toString())
+                        .param("status", "DEAD")
+                        .param("page", "1")
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+    assertThat(second.get("items").size()).isEqualTo(1);
+    assertThat(second.get("items").get(0).get("id").asText()).isEqualTo(oldest.toString());
+    assertThat(second.get("hasNext").asBoolean()).isFalse();
+    var endpointOnly =
+        jsonMapper.readTree(
+            mockMvc
+                .perform(
+                    get("/api/deliveries/page")
+                        .param("endpointId", endpointId.toString())
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+    assertThat(endpointOnly.get("items").size()).isEqualTo(4);
+    assertThat(endpointOnly.get("hasNext").asBoolean()).isFalse();
+    assertThat(endpointOnly.get("items").toString()).contains("SUCCEEDED");
+    var statusOnly =
+        jsonMapper.readTree(
+            mockMvc
+                .perform(get("/api/deliveries/page").param("status", "DEAD").param("size", "100"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+    assertThat(statusOnly.get("items").toString())
+        .contains(newest.toString(), middle.toString(), oldest.toString());
+    var recent =
+        jsonMapper.readTree(
+            mockMvc
+                .perform(get("/api/deliveries").param("limit", "1"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+    assertThat(recent.isArray()).isTrue();
+    assertThat(recent.size()).isEqualTo(1);
+    mockMvc
+        .perform(get("/api/deliveries/page").param("size", "0"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(get("/api/deliveries/page").param("size", "101"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(get("/api/deliveries/page").param("page", "-1"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(get("/api/deliveries/page").param("page", "10001"))
+        .andExpect(status().isBadRequest());
+  }
+
+  private UUID createHistoryEndpoint(String name) throws Exception {
+    String body =
+        mockMvc
+            .perform(
+                post("/api/endpoints")
+                    .contentType("application/json")
+                    .content(
+                        """
+                        {"name":"%s","url":"http://127.0.0.1:%d/hooks","secret":"history-test-secret"}
+                        """
+                            .formatted(name, TARGET.getAddress().getPort())))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return UUID.fromString(jsonMapper.readTree(body).get("id").asText());
+  }
+
   private UUID insertDelivery(UUID endpointId, String status, Instant nextAttemptAt) {
     UUID eventId = UUID.randomUUID();
     UUID deliveryId = UUID.randomUUID();

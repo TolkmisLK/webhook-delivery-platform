@@ -14,7 +14,8 @@ test.beforeEach(async ({ page }) => {
     const data = path.endsWith("/csrf") ? { headerName: "X-CSRF-TOKEN", token: "fixture-token" }
       : path.endsWith("/session") || path.endsWith("/login") ? { username: "admin" }
       : path.endsWith("/endpoints") ? [endpoint]
-      : path.endsWith("/stats") ? { total: 0, byStatus: {} } : [];
+      : path.endsWith("/stats") ? { total: 0, byStatus: {} }
+      : path.endsWith("/deliveries/page") ? { items: [], page: 0, size: 25, hasNext: false } : [];
     await route.fulfill({ json: data });
   });
   page.on("dialog", dialog => void dialog.accept());

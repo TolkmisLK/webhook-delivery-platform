@@ -6,6 +6,11 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- Added a bounded, status/Endpoint-filtered delivery-history page API and console pagination. The previous recent-deliveries array API remains compatible; numbered pages can shift as new jobs arrive.
+  新增按状态、Endpoint 筛选的有界投递历史页面 API 和控制台翻页。原最近投递数组 API 保持兼容；新任务到达时页码内容可能移动。
+
 ## [1.0.0] - 2026-08-27
 
 ### Changed / 变更

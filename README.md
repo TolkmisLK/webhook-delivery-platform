@@ -73,6 +73,7 @@ The [controlled small-batch and recovery drill](docs/controlled-drill.md) record
 - **Endpoint management:** edit names and URLs, pause endpoints, and rotate signing secrets. Version checks detect conflicting updates. Existing jobs keep their original URL and secret snapshot.
 - **Request security:** HMAC-SHA256 signatures, encrypted signing secrets, and checks on destination URLs, addresses, ports, redirects, and response sizes. See the [security model](docs/security.md) for deployment requirements.
 - **Console and monitoring:** delivery history, live status updates through SSE, Prometheus metrics, and operator action logs. Status notifications and attempt metrics are emitted after the database transaction commits.
+- **Unreleased history candidate:** the console can filter by delivery status and Endpoint and move through bounded server pages. `GET /api/deliveries/page` returns 25 jobs by default (at most 100), with `hasNext`; the existing `GET /api/deliveries?limit=50` response remains an array. New jobs can shift numbered pages between requests.
 - **Operator access:** one configured operator account, cookie sessions, CSRF protection, and login throttling.
 - **Local demo:** Docker Compose starts the app, database, and a receiver that verifies signatures and can simulate failed requests.
 
@@ -180,6 +181,7 @@ docker compose --profile observability up --build
 - **接收端管理：** 修改名称和地址、暂停接收端、轮换签名密钥。版本校验用于识别并发修改；已有任务继续使用创建时的地址和密钥快照。
 - **请求安全：** HMAC-SHA256 签名、签名密钥加密，以及目标 URL、地址、端口、重定向和响应大小检查。部署要求见[安全模型](docs/security.md)。
 - **控制台与监控：** 投递历史、SSE 实时状态、Prometheus 指标和人工操作日志。状态通知和尝试指标在数据库事务提交后发出。
+- **未发布的历史查询候选：** 控制台可按投递状态和 Endpoint 筛选，并翻阅服务端有界页面。新增 `GET /api/deliveries/page` 默认每页 25 条、最多 100 条，返回 `hasNext`；原有 `GET /api/deliveries?limit=50` 仍返回数组。两次请求之间新任务可能使页码内容移动。
 - **登录管理：** 一个预设操作者账号、Cookie 会话、CSRF 防护和登录限流。
 - **本地演示：** Docker Compose 启动应用、数据库和接收服务；接收服务支持验签和模拟请求失败。
 

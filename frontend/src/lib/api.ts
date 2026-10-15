@@ -3,6 +3,8 @@ import type {
   CsrfMetadata,
   Delivery,
   DeliveryDetail,
+  DeliveryPage,
+  DeliveryStatus,
   DeliveryStats,
   Endpoint,
   OperatorSession,
@@ -111,6 +113,12 @@ export const api = {
       body: JSON.stringify(input),
     }),
   listDeliveries: () => request<Delivery[]>("/api/deliveries?limit=50"),
+  listDeliveryPage: (filters: { endpointId?: string; status?: DeliveryStatus; page: number; size: number }) => {
+    const query = new URLSearchParams({ page: String(filters.page), size: String(filters.size) });
+    if (filters.endpointId) query.set("endpointId", filters.endpointId);
+    if (filters.status) query.set("status", filters.status);
+    return request<DeliveryPage>(`/api/deliveries/page?${query}`);
+  },
   getDelivery: (id: string) => request<DeliveryDetail>(`/api/deliveries/${id}`),
   getStats: () => request<DeliveryStats>("/api/deliveries/stats"),
   replay: (id: string) =>

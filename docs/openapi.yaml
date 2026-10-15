@@ -325,6 +325,40 @@ paths:
                   $ref: "#/components/schemas/Delivery"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+  /api/deliveries/page:
+    parameters:
+      - $ref: "#/components/parameters/RequestIdHeader"
+    get:
+      operationId: pageDeliveries
+      summary: Page delivery history with database filters / 按数据库筛选并翻页查询投递历史
+      description: Ordered by createdAt descending, then id descending. New deliveries can shift offset pages between requests. / 按创建时间倒序、ID 倒序；两次请求之间的新任务可能使页码结果移动。
+      parameters:
+        - name: endpointId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/DeliveryStatus" }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 0, maximum: 10000, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+      responses:
+        "200":
+          description: Bounded page and whether another page exists. / 有界页面及是否存在下一页。
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliveryPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
   /api/deliveries/stats:
     parameters:
       - $ref: "#/components/parameters/RequestIdHeader"
@@ -727,6 +761,17 @@ components:
         lastError: { type: [string, "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    DeliveryPage:
+      type: object
+      required: [items, page, size, hasNext]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Delivery"
+        page: { type: integer, minimum: 0, maximum: 10000 }
+        size: { type: integer, minimum: 1, maximum: 100 }
+        hasNext: { type: boolean }
     DeliveryStats:
       type: object
       required: [total, byStatus]

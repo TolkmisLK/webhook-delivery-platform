@@ -37,5 +37,8 @@ public final class DeliveryDtos {
   public record DeliveryDetailResponse(
       DeliveryResponse delivery, List<DeliveryAttemptResponse> attempts) {}
 
+  public record DeliveryPageResponse(
+      List<DeliveryResponse> items, int page, int size, boolean hasNext) {}
+
   public record DeliveryStats(long total, Map<DeliveryStatus, Long> byStatus) {}
 }

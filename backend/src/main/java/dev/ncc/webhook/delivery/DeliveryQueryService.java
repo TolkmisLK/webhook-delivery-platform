@@ -4,6 +4,7 @@ import dev.ncc.webhook.common.NotFoundException;
 import dev.ncc.webhook.config.DeliveryProperties;
 import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryAttemptResponse;
 import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryDetailResponse;
+import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryPageResponse;
 import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryResponse;
 import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryStats;
 import dev.ncc.webhook.endpoint.WebhookEndpointRepository;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +56,28 @@ class DeliveryQueryService {
     return jobRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit)).stream()
         .map(this::toResponse)
         .toList();
+  }
+
+  @Transactional(readOnly = true)
+  DeliveryPageResponse page(UUID endpointId, DeliveryStatus status, int page, int size) {
+    if (page < 0 || page > 10_000 || size < 1 || size > 100) {
+      throw new IllegalArgumentException("page must be 0..10000 and size must be 1..100");
+    }
+    PageRequest request = PageRequest.of(page, size);
+    Slice<DeliveryJob> jobs;
+    if (endpointId != null && status != null) {
+      jobs =
+          jobRepository.findByEndpointIdAndStatusOrderByCreatedAtDescIdDesc(
+              endpointId, status, request);
+    } else if (endpointId != null) {
+      jobs = jobRepository.findByEndpointIdOrderByCreatedAtDescIdDesc(endpointId, request);
+    } else if (status != null) {
+      jobs = jobRepository.findByStatusOrderByCreatedAtDescIdDesc(status, request);
+    } else {
+      jobs = jobRepository.findAllByOrderByCreatedAtDescIdDesc(request);
+    }
+    return new DeliveryPageResponse(
+        jobs.stream().map(this::toResponse).toList(), page, size, jobs.hasNext());
   }
 
   @Transactional(readOnly = true)
