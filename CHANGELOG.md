@@ -6,6 +6,11 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- Prepared v1.1.0-preview.1 source prerelease: aligned backend, frontend, OpenAPI, and outbound User-Agent versions to 1.1.0; added a tag gate that verifies Java/PostgreSQL, frontend/browser, OpenAPI, dependency audit, and Compose retry smoke results before publishing source archives.
+  准备 v1.1.0-preview.1 源码预览：将后端、前端、OpenAPI 与出站 User-Agent 版本统一为 1.1.0；新增标签门禁，在 Java/PostgreSQL、前端/浏览器、OpenAPI、依赖审计及 Compose 重试冒烟测试通过后才发布源码归档。
+
 ### Added / 新增
 
 - Added a bounded, status/Endpoint-filtered delivery-history page API and console pagination. The previous recent-deliveries array API remains compatible; numbered pages can shift as new jobs arrive.

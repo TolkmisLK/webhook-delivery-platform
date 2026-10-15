@@ -173,7 +173,7 @@ class WebhookFlowIT {
         .isEqualTo(deliveryId.toString());
     assertThat(RECEIVED_BODY.get()).contains("demo.completed").contains("\"result\":\"ok\"");
     assertThat(RECEIVED_SIGNATURE.get()).startsWith("v1=");
-    assertThat(RECEIVED_USER_AGENT.get()).isEqualTo("NCC-Webhook-Delivery/1.0.0");
+    assertThat(RECEIVED_USER_AGENT.get()).isEqualTo("NCC-Webhook-Delivery/1.1.0");
     assertThat(RECEIVED_COUNT.get()).isEqualTo(1);
 
     String detailJson =
