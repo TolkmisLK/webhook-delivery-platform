@@ -96,3 +96,41 @@ test("a slower previous page cannot overwrite a newer filtered response", async 
   await expect(page.getByText("fresh-dead.event")).toBeVisible();
   await expect(page.getByText("stale.event")).toHaveCount(0);
 });
+
+test("a pending inspection cannot reopen a delivery after the view changes", async ({ page }) => {
+  let releaseDetail!: () => void;
+  let detailStarted!: () => void;
+  const blocked = new Promise<void>(resolve => { releaseDetail = resolve; });
+  const started = new Promise<void>(resolve => { detailStarted = resolve; });
+  await page.route("**/api/**", async route => {
+    const url = new URL(route.request().url());
+    const path = url.pathname;
+    if (path.endsWith("/deliveries/old-delivery")) {
+      detailStarted();
+      await blocked;
+      await route.fulfill({ json: { delivery: delivery("old-delivery", "SUCCEEDED", "endpoint-a"), attempts: [] } });
+      return;
+    }
+    if (path.endsWith("/deliveries/page")) {
+      const filtered = url.searchParams.get("status") === "DEAD";
+      await route.fulfill({ json: { items: [delivery(filtered ? "new-delivery" : "old-delivery", filtered ? "DEAD" : "SUCCEEDED", "endpoint-a")], page: 0, size: 25, hasNext: false } });
+      return;
+    }
+    const data = path.endsWith("/csrf") ? { headerName: "X-CSRF-TOKEN", token: "fixture-token" }
+      : path.endsWith("/session") ? { username: "admin" }
+      : path.endsWith("/endpoints") ? endpoints
+      : path.endsWith("/stats") ? { total: 2, byStatus: { SUCCEEDED: 1, DEAD: 1, PENDING: 0, PROCESSING: 0, RETRY_SCHEDULED: 0, CANCELED: 0 } } : [];
+    await route.fulfill({ json: data });
+  });
+  await page.goto("/");
+  await expect(page.getByText("old-delivery.event")).toBeVisible();
+  await page.getByRole("button", { name: "Inspect" }).click();
+  await started;
+  await page.getByLabel("Status filter").selectOption("DEAD");
+  await expect(page.getByText("new-delivery.event")).toBeVisible();
+  const response = page.waitForResponse(value => value.url().endsWith("/deliveries/old-delivery"));
+  releaseDetail();
+  await response;
+  await page.waitForTimeout(100);
+  await expect(page.getByRole("heading", { name: "Attempt timeline" })).toHaveCount(0);
+});

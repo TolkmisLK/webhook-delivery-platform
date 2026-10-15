@@ -547,6 +547,13 @@ button:disabled {
   border-bottom: 0;
 }
 
+.delivery-page-limit {
+  margin: 0 28px 16px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: right;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

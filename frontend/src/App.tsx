@@ -13,6 +13,7 @@ import {
 type Locale = "en" | "zh";
 const deliveryStatuses: DeliveryStatus[] = ["PENDING", "PROCESSING", "RETRY_SCHEDULED", "SUCCEEDED", "DEAD", "CANCELED"];
 const pageSize = 25;
+const maxDeliveryPage = 10_000;
 type AuthState =
   | { status: "checking" }
   | { status: "signed-out" }
@@ -60,6 +61,7 @@ const copy = {
     page: "Page",
     loadingDeliveries: "Loading deliveries…",
     noMatches: "No deliveries match these filters.",
+    pageLimitReached: "Page limit reached. Narrow the filters to continue browsing.",
     statusNames: { PENDING: "Pending", PROCESSING: "Processing", RETRY_SCHEDULED: "Retry scheduled", SUCCEEDED: "Succeeded", DEAD: "Dead", CANCELED: "Canceled" },
     refresh: "Refresh",
     empty: "No deliveries yet. Register an endpoint and publish the first event.",
@@ -133,14 +135,15 @@ const copy = {
     publish: "发布事件",
     recentTitle: "最近推送",
     filterStatus: "状态筛选",
-    filterEndpoint: "Endpoint 筛选",
+    filterEndpoint: "接收地址筛选",
     allStatuses: "全部状态",
-    allEndpoints: "全部 Endpoint",
+    allEndpoints: "全部接收地址",
     previousPage: "上一页",
     nextPage: "下一页",
     page: "第",
     loadingDeliveries: "正在加载推送记录…",
     noMatches: "没有符合筛选条件的推送记录。",
+    pageLimitReached: "已达到页码上限。请缩小筛选范围继续查找。",
     statusNames: { PENDING: "待处理", PROCESSING: "处理中", RETRY_SCHEDULED: "等待重试", SUCCEEDED: "成功", DEAD: "死信", CANCELED: "已取消" },
     refresh: "刷新",
     empty: "暂无推送记录。请先注册 Endpoint，再发布第一个事件。",
@@ -213,6 +216,7 @@ export function App() {
   const [deliveryHasNext, setDeliveryHasNext] = useState(false);
   const [deliveryLoading, setDeliveryLoading] = useState(false);
   const loadSequence = useRef(0);
+  const detailSequence = useRef(0);
   const [stats, setStats] = useState<DeliveryStats>(emptyStats);
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -238,6 +242,7 @@ export function App() {
   const handleError = useCallback((cause: unknown) => {
     if (cause instanceof ApiRequestError && cause.status === 401) {
       loadSequence.current += 1;
+      detailSequence.current += 1;
       api.resetSessionState();
       setAuth({ status: "signed-out" });
       setEndpointEdit({ endpointId: "", name: "", url: "" });
@@ -374,6 +379,7 @@ export function App() {
       setEndpoints([]);
       setDeliveries([]);
       setStats(emptyStats);
+      detailSequence.current += 1;
       setSelectedDelivery(null);
       setStreamConnected(false);
     } catch (logoutError) {
@@ -454,8 +460,10 @@ export function App() {
   }
 
   async function inspect(id: string) {
+    const sequence = ++detailSequence.current;
     await run(async () => {
-      setSelectedDelivery(await api.getDelivery(id));
+      const detail = await api.getDelivery(id);
+      if (sequence === detailSequence.current) setSelectedDelivery(detail);
     });
   }
 
@@ -567,8 +575,8 @@ export function App() {
         <section className="panel table-panel">
           <div className="table-heading"><div><p className="section-index">03</p><h2>{t.recentTitle}</h2></div><button className="ghost-button" type="button" onClick={() => void load()}>{t.refresh}</button></div>
           <div className="delivery-filters">
-            <label>{t.filterStatus}<select value={deliveryStatus} onChange={(event) => { loadSequence.current += 1; setDeliveryLoading(true); setDeliveries([]); setDeliveryHasNext(false); setSelectedDelivery(null); setDeliveryPage(0); setDeliveryStatus(event.target.value as DeliveryStatus | ""); }}><option value="">{t.allStatuses}</option>{deliveryStatuses.map((status) => <option value={status} key={status}>{t.statusNames[status]}</option>)}</select></label>
-            <label>{t.filterEndpoint}<select value={deliveryEndpoint} onChange={(event) => { loadSequence.current += 1; setDeliveryLoading(true); setDeliveries([]); setDeliveryHasNext(false); setSelectedDelivery(null); setDeliveryPage(0); setDeliveryEndpoint(event.target.value); }}><option value="">{t.allEndpoints}</option>{endpoints.map((endpoint) => <option value={endpoint.id} key={endpoint.id}>{endpoint.name}</option>)}</select></label>
+            <label>{t.filterStatus}<select value={deliveryStatus} onChange={(event) => { loadSequence.current += 1; detailSequence.current += 1; setDeliveryLoading(true); setDeliveries([]); setDeliveryHasNext(false); setSelectedDelivery(null); setDeliveryPage(0); setDeliveryStatus(event.target.value as DeliveryStatus | ""); }}><option value="">{t.allStatuses}</option>{deliveryStatuses.map((status) => <option value={status} key={status}>{t.statusNames[status]}</option>)}</select></label>
+            <label>{t.filterEndpoint}<select value={deliveryEndpoint} onChange={(event) => { loadSequence.current += 1; detailSequence.current += 1; setDeliveryLoading(true); setDeliveries([]); setDeliveryHasNext(false); setSelectedDelivery(null); setDeliveryPage(0); setDeliveryEndpoint(event.target.value); }}><option value="">{t.allEndpoints}</option>{endpoints.map((endpoint) => <option value={endpoint.id} key={endpoint.id}>{endpoint.name}</option>)}</select></label>
           </div>
           {deliveryLoading ? <p className="empty-state" role="status">{t.loadingDeliveries}</p> : deliveries.length === 0 ? <p className="empty-state">{deliveryPage > 0 || deliveryStatus || deliveryEndpoint ? t.noMatches : t.empty}</p> : (
             <div className="table-wrap"><table><thead><tr><th>Event</th><th>{t.target}</th><th>Status</th><th>{t.attempts}</th><th>{t.response}</th><th>{t.updated}</th><th>{t.action}</th></tr></thead>
@@ -576,10 +584,11 @@ export function App() {
             </table></div>
           )}
           <div className="delivery-pagination">
-            <button className="ghost-button" type="button" disabled={deliveryLoading || deliveryPage === 0} onClick={() => { loadSequence.current += 1; setDeliveryLoading(true); setDeliveries([]); setDeliveryHasNext(false); setSelectedDelivery(null); setDeliveryPage((current) => current - 1); }}>{t.previousPage}</button>
+            <button className="ghost-button" type="button" disabled={deliveryLoading || deliveryPage === 0} onClick={() => { loadSequence.current += 1; detailSequence.current += 1; setDeliveryLoading(true); setDeliveries([]); setDeliveryHasNext(false); setSelectedDelivery(null); setDeliveryPage((current) => current - 1); }}>{t.previousPage}</button>
             <span>{locale === "zh" ? `第 ${deliveryPage + 1} 页` : `${t.page} ${deliveryPage + 1}`}</span>
-            <button className="ghost-button" type="button" disabled={deliveryLoading || !deliveryHasNext} onClick={() => { loadSequence.current += 1; setDeliveryLoading(true); setDeliveries([]); setDeliveryHasNext(false); setSelectedDelivery(null); setDeliveryPage((current) => current + 1); }}>{t.nextPage}</button>
+            <button className="ghost-button" type="button" disabled={deliveryLoading || !deliveryHasNext || deliveryPage >= maxDeliveryPage} onClick={() => { loadSequence.current += 1; detailSequence.current += 1; setDeliveryLoading(true); setDeliveries([]); setDeliveryHasNext(false); setSelectedDelivery(null); setDeliveryPage((current) => Math.min(current + 1, maxDeliveryPage)); }}>{t.nextPage}</button>
           </div>
+          {deliveryPage >= maxDeliveryPage && deliveryHasNext && <p className="delivery-page-limit">{t.pageLimitReached}</p>}
           {selectedDelivery && (
             <section className="attempt-detail" aria-labelledby="attempt-detail-title">
               <div className="attempt-detail-heading">
@@ -588,7 +597,7 @@ export function App() {
                   <h3 id="attempt-detail-title">{t.historyTitle}</h3>
                   <p>{t.historyHelp}</p>
                 </div>
-                <button className="ghost-button" type="button" onClick={() => setSelectedDelivery(null)}>{t.close}</button>
+                <button className="ghost-button" type="button" onClick={() => { detailSequence.current += 1; setSelectedDelivery(null); }}>{t.close}</button>
               </div>
               {selectedDelivery.attempts.length === 0 ? <p className="empty-state">{t.noAttempts}</p> : (
                 <ol className="attempt-timeline">

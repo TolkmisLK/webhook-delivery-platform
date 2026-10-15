@@ -66,7 +66,9 @@ class DeliveryQueryService {
     PageRequest request = PageRequest.of(page, size);
     Slice<DeliveryJob> jobs;
     if (endpointId != null && status != null) {
-      jobs = jobRepository.findByEndpointIdAndStatusOrderByCreatedAtDescIdDesc(endpointId, status, request);
+      jobs =
+          jobRepository.findByEndpointIdAndStatusOrderByCreatedAtDescIdDesc(
+              endpointId, status, request);
     } else if (endpointId != null) {
       jobs = jobRepository.findByEndpointIdOrderByCreatedAtDescIdDesc(endpointId, request);
     } else if (status != null) {
@@ -74,7 +76,8 @@ class DeliveryQueryService {
     } else {
       jobs = jobRepository.findAllByOrderByCreatedAtDescIdDesc(request);
     }
-    return new DeliveryPageResponse(jobs.stream().map(this::toResponse).toList(), page, size, jobs.hasNext());
+    return new DeliveryPageResponse(
+        jobs.stream().map(this::toResponse).toList(), page, size, jobs.hasNext());
   }
 
   @Transactional(readOnly = true)

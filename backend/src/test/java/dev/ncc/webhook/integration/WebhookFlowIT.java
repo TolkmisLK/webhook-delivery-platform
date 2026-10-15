@@ -856,9 +856,16 @@ class WebhookFlowIT {
     UUID newest = insertDelivery(endpointId, "DEAD", base.plusSeconds(300));
     insertDelivery(endpointId, "SUCCEEDED", base.plusSeconds(300));
     insertDelivery(otherEndpointId, "DEAD", base.plusSeconds(300));
-    jdbcTemplate.update("update delivery_job set created_at = ? where id = ?", Timestamp.from(base), oldest);
-    jdbcTemplate.update("update delivery_job set created_at = ? where id = ?", Timestamp.from(base.plusSeconds(1)), middle);
-    jdbcTemplate.update("update delivery_job set created_at = ? where id = ?", Timestamp.from(base.plusSeconds(2)), newest);
+    jdbcTemplate.update(
+        "update delivery_job set created_at = ? where id = ?", Timestamp.from(base), oldest);
+    jdbcTemplate.update(
+        "update delivery_job set created_at = ? where id = ?",
+        Timestamp.from(base.plusSeconds(1)),
+        middle);
+    jdbcTemplate.update(
+        "update delivery_job set created_at = ? where id = ?",
+        Timestamp.from(base.plusSeconds(2)),
+        newest);
 
     var first =
         jsonMapper.readTree(
@@ -928,10 +935,18 @@ class WebhookFlowIT {
                 .getContentAsString());
     assertThat(recent.isArray()).isTrue();
     assertThat(recent.size()).isEqualTo(1);
-    mockMvc.perform(get("/api/deliveries/page").param("size", "0")).andExpect(status().isBadRequest());
-    mockMvc.perform(get("/api/deliveries/page").param("size", "101")).andExpect(status().isBadRequest());
-    mockMvc.perform(get("/api/deliveries/page").param("page", "-1")).andExpect(status().isBadRequest());
-    mockMvc.perform(get("/api/deliveries/page").param("page", "10001")).andExpect(status().isBadRequest());
+    mockMvc
+        .perform(get("/api/deliveries/page").param("size", "0"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(get("/api/deliveries/page").param("size", "101"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(get("/api/deliveries/page").param("page", "-1"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(get("/api/deliveries/page").param("page", "10001"))
+        .andExpect(status().isBadRequest());
   }
 
   private UUID createHistoryEndpoint(String name) throws Exception {

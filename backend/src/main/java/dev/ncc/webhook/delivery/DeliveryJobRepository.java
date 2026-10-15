@@ -29,8 +29,7 @@ public interface DeliveryJobRepository extends JpaRepository<DeliveryJob, UUID> 
   Slice<DeliveryJob> findByStatusOrderByCreatedAtDescIdDesc(
       DeliveryStatus status, Pageable pageable);
 
-  Slice<DeliveryJob> findByEndpointIdOrderByCreatedAtDescIdDesc(
-      UUID endpointId, Pageable pageable);
+  Slice<DeliveryJob> findByEndpointIdOrderByCreatedAtDescIdDesc(UUID endpointId, Pageable pageable);
 
   Slice<DeliveryJob> findByEndpointIdAndStatusOrderByCreatedAtDescIdDesc(
       UUID endpointId, DeliveryStatus status, Pageable pageable);
