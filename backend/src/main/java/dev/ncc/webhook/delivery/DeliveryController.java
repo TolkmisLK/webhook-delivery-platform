@@ -1,6 +1,7 @@
 package dev.ncc.webhook.delivery;
 
 import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryDetailResponse;
+import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryPageResponse;
 import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryResponse;
 import dev.ncc.webhook.delivery.DeliveryDtos.DeliveryStats;
 import java.util.List;
@@ -29,6 +30,15 @@ public class DeliveryController {
   @GetMapping
   List<DeliveryResponse> recent(@RequestParam(defaultValue = "50") int limit) {
     return service.recent(limit);
+  }
+
+  @GetMapping("/page")
+  DeliveryPageResponse page(
+      @RequestParam(required = false) UUID endpointId,
+      @RequestParam(required = false) DeliveryStatus status,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "25") int size) {
+    return service.page(endpointId, status, page, size);
   }
 
   @GetMapping("/stats")

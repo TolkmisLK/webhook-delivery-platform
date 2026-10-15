@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -22,6 +23,17 @@ public interface DeliveryJobRepository extends JpaRepository<DeliveryJob, UUID> 
   long countByStatus(DeliveryStatus status);
 
   List<DeliveryJob> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+  Slice<DeliveryJob> findAllByOrderByCreatedAtDescIdDesc(Pageable pageable);
+
+  Slice<DeliveryJob> findByStatusOrderByCreatedAtDescIdDesc(
+      DeliveryStatus status, Pageable pageable);
+
+  Slice<DeliveryJob> findByEndpointIdOrderByCreatedAtDescIdDesc(
+      UUID endpointId, Pageable pageable);
+
+  Slice<DeliveryJob> findByEndpointIdAndStatusOrderByCreatedAtDescIdDesc(
+      UUID endpointId, DeliveryStatus status, Pageable pageable);
 
   @Query(
       """

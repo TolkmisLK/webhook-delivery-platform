@@ -31,6 +31,13 @@ export interface Delivery {
   updatedAt: string;
 }
 
+export interface DeliveryPage {
+  items: Delivery[];
+  page: number;
+  size: number;
+  hasNext: boolean;
+}
+
 export interface DeliveryStats {
   total: number;
   byStatus: Record<DeliveryStatus, number>;
