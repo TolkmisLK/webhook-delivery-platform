@@ -241,4 +241,3 @@ HTTP API 和 SSE 事件遵循 [1.x 兼容性政策](docs/api-compatibility.md)�
 ## License
 
 [MIT](LICENSE) © 2026 NCC
-
