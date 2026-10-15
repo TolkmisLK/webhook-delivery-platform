@@ -5,11 +5,11 @@ Send events to HTTP endpoints, retry failures, and inspect delivery history.
 
 [English](#english) · [中文](#中文) · [Local retry walkthrough / 本地重试演示](docs/demo.md)
 
-The [public v1.0.0 stable release](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0) contains source code; the walkthrough runs locally with Docker Compose. The v1.1.0-preview.1 source preview uses a tag-gated release process and is published only after its CI gates pass. Delivery is at least once, so receivers must deduplicate events.
+Releases: [v1.0.0 stable](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0) · [v1.1.0-preview.1 source preview](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.1.0-preview.1). The preview adds filtered, paginated delivery history; it is a prerelease, not a stable production release. Both provide source code for a local Docker Compose walkthrough, with no hosted service or binary installer. Delivery is at least once, so receivers must deduplicate events.
 
 See the [v1.1.0-preview.1 notes](docs/release-v1.1.0-preview.1.md) for the preview scope and verification limits.
 
-[公开的 v1.0.0 稳定版本](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0)提供源码；演示需要在本地用 Docker Compose 运行。v1.1.0-preview.1 源码预览采用标签门禁流程，仅在对应 CI 通过后发布。投递语义为至少一次，接收方需要处理重复事件。
+版本入口：[v1.0.0 稳定版](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0) · [v1.1.0-preview.1 源码预览版](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.1.0-preview.1)。预览版新增投递历史筛选与翻页，属于预发布版本，并非稳定生产版本。两个版本都提供本地 Docker Compose 演示所需源码，不提供托管服务或二进制安装包。投递语义为至少一次，接收方需要处理重复事件。
 
 预览范围与验证边界见 [v1.1.0-preview.1 说明](docs/release-v1.1.0-preview.1.md)。
 
@@ -77,7 +77,7 @@ The [controlled small-batch and recovery drill](docs/controlled-drill.md) record
 - **Endpoint management:** edit names and URLs, pause endpoints, and rotate signing secrets. Version checks detect conflicting updates. Existing jobs keep their original URL and secret snapshot.
 - **Request security:** HMAC-SHA256 signatures, encrypted signing secrets, and checks on destination URLs, addresses, ports, redirects, and response sizes. See the [security model](docs/security.md) for deployment requirements.
 - **Console and monitoring:** delivery history, live status updates through SSE, Prometheus metrics, and operator action logs. Status notifications and attempt metrics are emitted after the database transaction commits.
-- **Unreleased history candidate:** the console can filter by delivery status and Endpoint and move through bounded server pages. `GET /api/deliveries/page` returns 25 jobs by default (at most 100), with `hasNext`; the existing `GET /api/deliveries?limit=50` response remains an array. New jobs can shift numbered pages between requests.
+- **History in v1.1.0-preview.1:** the console can filter by delivery status and receiving Endpoint and move through bounded server pages. `GET /api/deliveries/page` returns 25 jobs by default (at most 100), with `hasNext`; the existing `GET /api/deliveries?limit=50` response remains an array. New jobs can shift numbered pages between requests.
 - **Operator access:** one configured operator account, cookie sessions, CSRF protection, and login throttling.
 - **Local demo:** Docker Compose starts the app, database, and a receiver that verifies signatures and can simulate failed requests.
 
@@ -125,7 +125,7 @@ The backend checks also verify Java formatting and the Spring Modulith dependenc
 
 ### Current scope
 
-The latest stable release is [v1.0.0](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0). It supports one configured operator account. Multi-user accounts, roles, tenant isolation, external identity providers, and distributed rate limiting are not implemented.
+The latest stable release is [v1.0.0](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0); the newer [v1.1.0-preview.1](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.1.0-preview.1) is a source preview. The platform supports one configured operator account. Multi-user accounts, roles, tenant isolation, external identity providers, and distributed rate limiting are not implemented.
 
 The HTTP API and SSE events follow the [1.x compatibility policy](docs/api-compatibility.md). Before deploying beyond the local demo, follow the [deployment checklist](docs/production-readiness.md) and [backup and recovery guide](docs/operations-recovery.md).
 
@@ -185,7 +185,7 @@ docker compose --profile observability up --build
 - **接收端管理：** 修改名称和地址、暂停接收端、轮换签名密钥。版本校验用于识别并发修改；已有任务继续使用创建时的地址和密钥快照。
 - **请求安全：** HMAC-SHA256 签名、签名密钥加密，以及目标 URL、地址、端口、重定向和响应大小检查。部署要求见[安全模型](docs/security.md)。
 - **控制台与监控：** 投递历史、SSE 实时状态、Prometheus 指标和人工操作日志。状态通知和尝试指标在数据库事务提交后发出。
-- **未发布的历史查询候选：** 控制台可按投递状态和 Endpoint 筛选，并翻阅服务端有界页面。新增 `GET /api/deliveries/page` 默认每页 25 条、最多 100 条，返回 `hasNext`；原有 `GET /api/deliveries?limit=50` 仍返回数组。两次请求之间新任务可能使页码内容移动。
+- **v1.1.0-preview.1 历史查询：** 控制台可按投递状态和接收地址筛选，并翻阅服务端有界页面。新增 `GET /api/deliveries/page` 默认每页 25 条、最多 100 条，返回 `hasNext`；原有 `GET /api/deliveries?limit=50` 仍返回数组。两次请求之间新任务可能使页码内容移动。
 - **登录管理：** 一个预设操作者账号、Cookie 会话、CSRF 防护和登录限流。
 - **本地演示：** Docker Compose 启动应用、数据库和接收服务；接收服务支持验签和模拟请求失败。
 
@@ -234,10 +234,11 @@ PostgreSQL 集成测试会启动真实目标服务，通过 API 验证幂等接�
 
 ### 当前范围
 
-最新稳定版本为 [v1.0.0](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0)，支持一个预设操作者账号。目前没有实现多人账号、角色、租户隔离、外部身份提供方和分布式限流。
+最新稳定版本为 [v1.0.0](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0)；更新的 [v1.1.0-preview.1](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.1.0-preview.1) 是源码预览版。平台支持一个预设操作者账号，目前没有实现多人账号、角色、租户隔离、外部身份提供方和分布式限流。
 
 HTTP API 和 SSE 事件遵循 [1.x 兼容性政策](docs/api-compatibility.md)。在本地演示以外的环境部署前，请按照[部署检查清单](docs/production-readiness.md)和[备份恢复说明](docs/operations-recovery.md)完成配置。
 
 ## License
 
 [MIT](LICENSE) © 2026 NCC
+
