@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ["v1.1.0-preview.1"]
 
 permissions:
   contents: read
@@ -67,3 +68,86 @@ jobs:
       - name: Audit production dependencies
         working-directory: frontend
         run: npm audit --omit=dev --audit-level=high
+
+  compose-smoke:
+    name: Compose · retry smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Start local demo
+        run: |
+          cp .env.example .env
+          docker compose up --build --wait --wait-timeout 180
+
+      - name: Verify signed retry delivery
+        run: node --env-file=.env scripts/demo-retry.mjs
+
+      - name: Show service health on failure
+        if: failure()
+        run: |
+          docker compose ps -a
+          docker compose logs --no-color backend receiver postgres frontend
+
+      - name: Stop local demo
+        if: always()
+        run: docker compose down --volumes
+
+  publish-preview:
+    name: Publish source preview
+    if: github.ref == 'refs/tags/v1.1.0-preview.1'
+    needs: [backend, frontend, compose-smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout exact tag commit
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Verify tag matches current main and version
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = 'v1.1.0-preview.1'
+          git fetch origin +refs/heads/main:refs/remotes/origin/main
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse "refs/tags/${GITHUB_REF_NAME}^{commit}")" = "$GITHUB_SHA"
+          remote_tag_commit="$(git ls-remote origin "refs/tags/${GITHUB_REF_NAME}^{}" | cut -f1)"
+          if [ -z "$remote_tag_commit" ]; then
+            remote_tag_commit="$(git ls-remote origin "refs/tags/${GITHUB_REF_NAME}" | cut -f1)"
+          fi
+          test "$remote_tag_commit" = "$GITHUB_SHA"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$GITHUB_SHA"
+          node -e 'const p=require("./frontend/package.json"); const l=require("./frontend/package-lock.json"); if(p.version!=="1.1.0" || l.version!=="1.1.0" || l.packages[""].version!=="1.1.0") process.exit(1)'
+          grep -q '<version>1.1.0</version>' backend/pom.xml
+          grep -q 'version: 1.1.0' docs/openapi.yaml
+          grep -q 'NCC-Webhook-Delivery/1.1.0' backend/src/main/java/dev/ncc/webhook/delivery/WebhookHttpClient.java
+          test -s docs/release-v1.1.0-preview.1.md
+
+      - name: Publish prerelease with source archives only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --latest=false \
+            --title 'v1.1.0-preview.1 · source preview / 源码预览' \
+            --notes-file docs/release-v1.1.0-preview.1.md

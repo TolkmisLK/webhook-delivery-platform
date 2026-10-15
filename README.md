@@ -5,9 +5,13 @@ Send events to HTTP endpoints, retry failures, and inspect delivery history.
 
 [English](#english) · [中文](#中文) · [Local retry walkthrough / 本地重试演示](docs/demo.md)
 
-The [public v1.0.0 release](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0) contains source code; the walkthrough runs locally with Docker Compose. Delivery is at least once, so receivers must deduplicate events.
+The [public v1.0.0 stable release](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0) contains source code; the walkthrough runs locally with Docker Compose. The v1.1.0-preview.1 source preview uses a tag-gated release process and is published only after its CI gates pass. Delivery is at least once, so receivers must deduplicate events.
 
-[公开的 v1.0.0 版本](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0)提供源码；演示需要在本地用 Docker Compose 运行。投递语义为至少一次，接收方需要处理重复事件。
+See the [v1.1.0-preview.1 notes](docs/release-v1.1.0-preview.1.md) for the preview scope and verification limits.
+
+[公开的 v1.0.0 稳定版本](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0)提供源码；演示需要在本地用 Docker Compose 运行。v1.1.0-preview.1 源码预览采用标签门禁流程，仅在对应 CI 通过后发布。投递语义为至少一次，接收方需要处理重复事件。
+
+预览范围与验证边界见 [v1.1.0-preview.1 说明](docs/release-v1.1.0-preview.1.md)。
 
 ## English
 
@@ -121,7 +125,7 @@ The backend checks also verify Java formatting and the Spring Modulith dependenc
 
 ### Current scope
 
-The latest release is [v1.0.0](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0). It supports one configured operator account. Multi-user accounts, roles, tenant isolation, external identity providers, and distributed rate limiting are not implemented.
+The latest stable release is [v1.0.0](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0). It supports one configured operator account. Multi-user accounts, roles, tenant isolation, external identity providers, and distributed rate limiting are not implemented.
 
 The HTTP API and SSE events follow the [1.x compatibility policy](docs/api-compatibility.md). Before deploying beyond the local demo, follow the [deployment checklist](docs/production-readiness.md) and [backup and recovery guide](docs/operations-recovery.md).
 
@@ -230,7 +234,7 @@ PostgreSQL 集成测试会启动真实目标服务，通过 API 验证幂等接�
 
 ### 当前范围
 
-最新版本为 [v1.0.0](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0)，支持一个预设操作者账号。目前没有实现多人账号、角色、租户隔离、外部身份提供方和分布式限流。
+最新稳定版本为 [v1.0.0](https://github.com/TolkmisLK/webhook-delivery-platform/releases/tag/v1.0.0)，支持一个预设操作者账号。目前没有实现多人账号、角色、租户隔离、外部身份提供方和分布式限流。
 
 HTTP API 和 SSE 事件遵循 [1.x 兼容性政策](docs/api-compatibility.md)。在本地演示以外的环境部署前，请按照[部署检查清单](docs/production-readiness.md)和[备份恢复说明](docs/operations-recovery.md)完成配置。
 
